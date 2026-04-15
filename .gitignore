@@ -1,0 +1,28 @@
+# MATLAB / Simulink build artifacts
+*.asv
+*.autosave
+*.slxc
+*.mexw64
+*.mexa64
+*.mexmaci64
+slprj/
+sccprj/
+codegen/
+
+# Simulink cache
+*.slx.r*
+*.slx.bak
+
+# MATLAB workspace dumps
+*.mat
+
+# Logs and temp files
+*.log
+octave-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Symlink to Report repo (separate submodule)
+Report
