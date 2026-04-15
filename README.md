@@ -17,6 +17,7 @@ Team repository for MATLAB code, Simulink models, and mission scripts for the 34
 | `simulink/` | Simulink models (`regbot_1mg`, balance loop, etc.) |
 | `figures/` | Generated plots (Bode, step responses, XY-plane) |
 | `missions/` | REGBOT mission scripts (`.txt` files) |
+| `logs/` | Log files recorded from REGBOT during experiments |
 | `Report/` | Symlink to the Overleaf report repo (not tracked) |
 
 ## Tasks
