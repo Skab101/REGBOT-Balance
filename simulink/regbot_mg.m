@@ -118,8 +118,8 @@ fprintf('  GM = %.1f dB\n', 20*log10(GM));
 load_system(model);
 open_system(model);
 
-Gwv   = identify_tf(model, '/Limit9v', '/wheel_vel_filter');
-Gtilt = identify_tf(model, '/vel_ref', '/robot with balance');
+Gwv   = identify_tf(model, '/Limit9v', '/wheel_vel_filter')
+Gtilt = identify_tf(model, '/vel_ref', '/robot with balance')
 
 %% 6. Analysis — poles, zeros, stability
 print_plant('Gwv (voltage -> wheel velocity)', Gwv);
