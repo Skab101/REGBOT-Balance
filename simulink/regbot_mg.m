@@ -26,23 +26,29 @@ s = tf('s');
 model = 'regbot_1mg';
 
 % Output directory for plots — auto-detected
-%   - If the Obsidian vault folder exists, plots go there (useful for Mads).
-%   - Otherwise, plots are saved locally in simulink/images/ (default for team).
-%   - Set FORCE_LOCAL = true to always use the local folder.
-FORCE_LOCAL = false;
+%   - If Mads's Obsidian vault is reachable, plots go there (so the notes
+%     in the vault render current figures for him).
+%   - Otherwise plots go to docs/images/ in the team repo, so teammates
+%     who open docs/ as an Obsidian vault see their own fresh plots in
+%     the REGBOT Balance Assignment and Lesson 10 notes.
+%   - Set FORCE_DOCS = true to always use docs/images/ (useful when you
+%     want to preview a change as a teammate would see it).
+FORCE_DOCS = false;
 
 SCRIPT_DIR   = fileparts(mfilename('fullpath'));
-OBSIDIAN_DIR = fullfile(SCRIPT_DIR, '..','..','..','..','Obsidian','Courses', ...
+REPO_ROOT    = fullfile(SCRIPT_DIR, '..');
+OBSIDIAN_DIR = fullfile(REPO_ROOT, '..','..','..','Obsidian','Courses', ...
     '34722 Linear Control Design 1','Exercises','Work','regbot','Images');
-LOCAL_DIR    = fullfile(SCRIPT_DIR, 'images');
+DOCS_DIR     = fullfile(REPO_ROOT, 'docs','images');
 
-if ~FORCE_LOCAL && exist(OBSIDIAN_DIR, 'dir')
+if ~FORCE_DOCS && exist(OBSIDIAN_DIR, 'dir')
     IMG_DIR = OBSIDIAN_DIR;
     fprintf('Plots -> Obsidian vault: %s\n', IMG_DIR);
 else
-    IMG_DIR = LOCAL_DIR;
+    IMG_DIR = DOCS_DIR;
     if ~exist(IMG_DIR, 'dir'), mkdir(IMG_DIR); end
-    fprintf('Plots -> local folder:   %s\n', IMG_DIR);
+    fprintf('Plots -> team repo docs: %s\n', IMG_DIR);
+    fprintf('        (note: these are local regenerations — do NOT git add them)\n');
 end
 
 %% 2. REGBOT physical parameters (used by the Simulink model)

@@ -14,7 +14,10 @@ Team repository for MATLAB code, Simulink models, and mission scripts for the 34
 | Folder | Contents |
 |--------|----------|
 | `src/` | MATLAB scripts for controller design (Tasks 1-4) |
-| `simulink/` | Simulink models (`regbot_1mg`, balance loop, etc.) |
+| `simulink/` | Simulink models (`regbot_1mg`, balance loop, etc.) and `regbot_mg.m` |
+| `data/` | Day 5 identification `.mat` files (shared so teammates can skip Day 5) |
+| `docs/` | Mirror of the REGBOT-relevant Obsidian notes (openable as a vault) |
+| `scripts/` | Utility scripts (e.g. `sync_docs.sh` to refresh `docs/` from the vault) |
 | `figures/` | Generated plots (Bode, step responses, XY-plane) |
 | `missions/` | REGBOT mission scripts (`.txt` files) |
 | `logs/` | Log files recorded from REGBOT during experiments |
@@ -49,9 +52,31 @@ Open MATLAB in `simulink/` and run `regbot_mg`. The script automatically:
 The script **auto-detects** where to save plots:
 
 - **If you have Mads's Obsidian vault** at `DTU/Obsidian/Courses/34722 Linear Control Design 1/...`, plots go there (so they embed directly in his notes).
-- **Otherwise**, plots are saved locally in `simulink/images/` (gitignored, so they stay on your machine).
+- **Otherwise**, plots are saved to `docs/images/`. When you open `docs/` as an Obsidian vault, the REGBOT Balance Assignment and Lesson 10 notes will show **your** freshly generated plots.
 
-To force local output even with Obsidian present, set `FORCE_LOCAL = true` at the top of the script.
+> **Don't commit `docs/images/*.png` from a teammate machine** — the tracked
+> images are Mads's canonical versions synced from his vault. Your local
+> regenerations will show up as uncommitted diffs; leave them alone.
+
+To force output to `docs/images/` even when the vault is available, set `FORCE_DOCS = true` at the top of the script.
+
+## Reading the notes
+
+`docs/` mirrors the REGBOT-related Obsidian notes from Mads's vault:
+
+- [`docs/REGBOT Balance Assignment.md`](docs/REGBOT%20Balance%20Assignment.md) — running progress log, Tasks 1–4
+- [`docs/Lesson 10 - Unstable Systems and REGBOT Balance.md`](docs/Lesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance.md) — lecture theory
+- [`docs/PLAN.md`](docs/PLAN.md) — early phase/role plan
+
+Open the `docs/` folder directly in Obsidian ("Open folder as vault") for the best reading experience — wikilinks and image embeds resolve automatically.
+
+Mads refreshes `docs/` with:
+
+```bash
+bash scripts/sync_docs.sh
+```
+
+Teammates: you never need to run this — just `git pull` and the latest notes are there.
 
 ## Report
 
