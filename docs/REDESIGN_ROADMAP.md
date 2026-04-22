@@ -45,8 +45,16 @@ Detailed plan: see Claude's plan file (local to the working machine).
     - [x] **Reportable Test 3a = v2 (0.343 m, passes spec).** v3 balance-tightness improvement cited separately.
     - [x] **Test 3b v3: PASS** at 0.8 m/s. Completed square, 359.8° heading. Peak tilt +25.5° (v2 was +22°); tilt std 5.03° (tighter than v2's 5.72°). **Motor voltage peak 7.31 V (91% of ±8 V budget)** — v2 had 4.67 V; the higher Kpwv costs voltage headroom. Still passes spec.
     - [x] **Test 4 v3: PASS** — the cleanest result of the whole campaign. Final x = 1.964 m (3.6 cm short; v2 was 10.7 cm short — 3× closer). No overshoot, no late limit cycle. Peak tilt +17° (v2 +25°, −31%). Tilt std 2.93° (v2 5.18°). Peak voltage 4.95 V, **no saturation** (the 3b worry didn't materialise because position-loop vref is smooth, not step-like). Peak velocity 0.79 m/s (v2 1.01; still > 0.7 spec).
-- [ ] **Phase 7** — Documentation sweep (`docs/*.md` + Report LaTeX)
-- [ ] **Phase 8** — Merge `day5-redesign` → `main` on both submodules (`--no-ff`), then bump DTU main pointers
+- [x] **Phase 7** — Documentation sweep (`docs/*.md` + Report LaTeX)
+    - [x] `docs/REGBOT Balance Assignment.md` updated: v3 canonical gains table, redesign story, v1→v3 shift table, hardware outcome summary, Test 3a nuance, Session 4 progress-log entry.
+    - [x] v3 figures copied into `Report/images/` (7 files: Test 0/3a/3b-XY/3b-TS/4 + two sanity sims).
+    - [x] `Report/sections/wheel-speed-controller.tex` — Day 5 on-floor plant, Kp = 13.2037, Test 0 v3 numbers, redesign narrative in place of old caveat.
+    - [x] `Report/sections/balance-controller.tex` — v3 design numbers (tipost 0.1245, titilt 0.2, tdtilt 0.0442 = −67%, Kp 1.1999), Test 3a split (v2 for drift spec, v3 for tightness).
+    - [x] `Report/sections/velocity-controller.tex` — RHP zero refined 8.67 → 8.51, Kpvel 0.1581, PM 68.98°, Test 3b v3 figures + saturation-margin discussion (7.31 V / 91% budget).
+    - [x] `Report/sections/position-controller.tex` — Kppos 0.5411, Test 4 v3 as the cleanest run (3.6 cm short, no overshoot, no late limit cycle).
+    - [x] `Report/sections/conclusion.tex` — v3 final-gains table, v3 hardware summary, new first bullet on the redesign process itself.
+    - [x] `main.tex` compiles clean (24 pages, no warnings after two passes).
+- [ ] **Phase 8** — Merge `day5-redesign` → `main` on both submodules (`--no-ff`), then bump DTU main pointers (**ON HOLD pending user approval**)
 
 ---
 
@@ -65,3 +73,4 @@ Detailed plan: see Claude's plan file (local to the working machine).
 | 2026-04-22 | 6 | **Test 3a v3 re-run after tilt-offset recal (Y=175):** drift 0.505 m (marginal fail of 0.5 spec). Bias unchanged at +1.11° — either one more calibration iteration needed (Y ≈ 176), or the 1° is a physical CG/wheel-radius asymmetry and cannot be calibrated out. Tilt std 1.87° — 61% tighter than v2. **Decision:** use v2 3a (0.343 m) as the reportable 3a; v3 improvement documented via tilt-std. Tests 3b/4 will not see this because the outer loops regulate it away. |
 | 2026-04-22 | 6 | **Test 3b v3 PASS** at 0.8 m/s. Completed full square, 359.8°. Peak tilt +25.5° (v2 +22°), tilt std 5.03° (tighter). **Motor voltage peak 7.31 V (91 % of ±8 V)** — 57 % closer to saturation than v2's 4.67 V, because 4× Kpwv makes the inner PI respond harder to corner vel_ref steps. Classic speed-for-margin trade from the redesign. Still within spec. |
 | 2026-04-22 | 6 | **Test 4 v3 PASS — strongest result of campaign.** Final x 1.964 m (−3.6 cm vs v2's −10.7 cm; 3× closer to target). No overshoot, **no late limit cycle** (was a visible artefact in v2). Peak tilt +17° (v2 +25°, −31 %). Tilt std 2.93° vs 5.18°. Peak V 4.95 (no saturation). Peak v 0.79 m/s (still > 0.7 spec, though below v2's 1.01 because tighter control = less over-tilt = less thrust). |
+| 2026-04-22 | 7 | **Phase 7 complete.** Obsidian `REGBOT Balance Assignment.md` now carries a top-of-doc v3 Day 5 Redesign callout (canonical gains, story, v1/v3 shift table, hardware outcome, Test 3a nuance), Task 1/2/4 in-doc tables show v1 vs v3 with v3 flagged canonical, and a 2026-04-22 Session 4 progress-log entry was added. In the Report submodule (`day5-redesign`), 7 v3 figures were copied into `images/`, all five `.tex` section files (wheel-speed, balance, velocity, position, conclusion) were updated per-section with v3 plant/gain/test numbers and the first-attempt→redesign narrative. `main.tex` compiles clean on two passes (24 pages). Commits landed per-section for reviewability. Phase 8 (merge) is held per user instruction; no `main` merge and no DTU submodule-pointer bumps attempted. |
