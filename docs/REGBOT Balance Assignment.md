@@ -536,33 +536,105 @@ tivel = 3.0000;
 
 `design_task4_position`
 
-With Tasks 1 + 2 + 3 closed, linearise `pos_ref` → `x_position`. Result is 11th-order:
+### What this loop does
+
+Task 4 is the outermost loop — the position controller that actually drives the robot to a target $x_\text{ref}$ and stops it there. Input: $x_\text{ref}$ from the `topos` mission command. Output: $v_\text{ref}$ into Task 3. This is the loop the 2 m step-move mission exercises; everything below has to already be rock-solid for Task 4's tight $\omega_c = 0.6$ rad/s to make sense.
+
+Controller choice: **pure P** (qualitatively different from Tasks 1-3). The plant $G_{pos,\text{outer}}$ already has a **free integrator** at the origin from the $v \to x$ integration (position is $\int v\,dt$, which is $1/s$ in the s-domain). That makes the plant Type-1 without any controller help, so plain P is sufficient for $e_{ss} = 0$ on a step reference ([Fundamentals §11.2](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory)). Adding PI would lift the loop to Type-2 (zero error on a *ramp*), but the mission is a position *step*, so no PI.
+
+### The plant
+
+With Tasks 1 + 2 + 3 closed, `linearize` on `pos_ref` → `x_position` gives an 11th-order $G_{pos,\text{outer}}$:
 
 ![[regbot_task4_plant_pz.png]]
 *$G_{pos,\text{outer}}$ pole-zero map. $0$ RHP poles, RHP zero at $+8.67$ rad/s (inherited from Task 3 physics), and a pole on the imaginary axis at the origin — the free integrator from velocity to position.*
 
-**Type-1 → pure P is enough** for zero step-tracking error. Iterated on $\omega_c$ to clear the peak-velocity mission spec ($v > 0.7$ m/s on a $2$ m move); $\omega_c = 0.6$ rad/s is the landing.
+Key features:
 
-**Phase balance at $\omega_c = 0.6$ rad/s:** $\angle G_{pos,\text{outer}}(j0.6) = -121.74°$ → $\phi_\text{Lead}$ required $= +1.74°$ (tiny).
+- **Zero RHP poles** — Task 2's stabilisation is still holding.
+- **RHP zero at $+8.67$ rad/s** — physics-fixed, inherited through Task 3 from Task 2. Still caps achievable bandwidth.
+- **Free integrator at $s = 0$** — the velocity-to-position integration. This is what makes pure P sufficient for zero step-tracking error.
 
-**Ideal Lead:** $\tau_{d,\text{pos}} = \tan(1.74°)/0.6 = 0.0505$ s.
+### Why $\omega_c = 0.6$ rad/s (iterated against mission specs, not derived)
 
-**Gain.** $|C_\text{Lead}\,G_{pos,\text{outer}}|(j0.6) = 1.8479$ → $K_P = 1/1.8479 = 0.5411$.
+Unlike Tasks 1-3, Task 4's $\omega_c$ is not handed down from a bandwidth / phase-margin argument — it's chosen by **iterating against time-domain mission specs**: reach $2$ m, peak velocity ${>}0.7$ m/s, within $\leq 10$ s. The script comments (lines 80–87) record the iteration:
+
+| $\omega_c$ | $\gamma_M$ | Peak velocity | Settling | Verdict |
+|---|---|---|---|---|
+| $0.2$ rad/s | $87°$ | $0.33$ m/s | $20$ s | Too slow — fails both velocity *and* settling specs |
+| $0.5$ rad/s | $66°$ | $0.68$ m/s | $12$ s | Just short ($0.02$ m/s below $0.7$ spec) |
+| **$0.6$ rad/s** | **${\approx}60°$** | **${\approx}0.82$ m/s** | **${\approx}10$ s** | **Chosen — clears both** |
+
+$\omega_c = 0.6$ is only $1.67\times$ below Task 3's $1$ rad/s — tight by the "$\geq 5\times$ cascade separation" rule, but acceptable because Task 3's closed loop has $\gamma_M \approx 69°$ and doesn't add much phase lag at $0.6$ rad/s. **The aha:** outer loops are often where the *mission specs* start driving the design, not phase margins. The inner loops set up the bandwidth budget; the outer loop spends it.
+
+### Specifications, translated to the frequency domain
+
+| Spec | Value | What it means |
+|---|---|---|
+| Crossover $\omega_c$ | $0.6$ rad/s | Iterated to clear peak-velocity $\geq 0.7$ m/s on the 2 m mission move. |
+| Phase margin $\gamma_M$ | $\geq 60°$ | Course default. Design-time hits $60°$ *exactly* with the tiny Lead. |
+
+### Step 1 — Phase balance: how much Lead?
+
+No PI this time (plant already Type-1), so the phase balance simplifies to:
+
+$$\gamma_M - 180° \;=\; \angle G_{pos,\text{outer}}(j\omega_c) + \phi_\text{Lead}$$
+
+**Plug in at $\omega_c = 0.6$:**
+
+| Term | Value |
+|---|---|
+| $\angle G_{pos,\text{outer}}(j0.6)$ | $-121.74°$ |
+| Required $\phi_\text{Lead}$ for $60°$ PM | $+1.74°$ |
+
+The plant already gives $\sim 58°$ of natural PM on its own; the Lead only has to fill the last $1.74°$ — **basically noise**.
+
+**Ideal Lead:**
+
+$$\tau_{d,\text{pos}} \;=\; \frac{\tan 1.74°}{0.6} \;=\; 0.0505\,\mathrm{s}$$
+
+**In MATLAB** (lines 98–119). Script does `mod(phi + 180, 360) - 180` to wrap the continuous-phase output into $[-180°, 180°)$ (same unwrap issue as Task 3), then computes `phi_Lead`. Because it's $> 0$, the script takes the standard-Lead branch: `tau_d_pos = tand(phi_Lead)/wc_pos; C_Lead_pos = tau_d_pos*s + 1`.
+
+### Step 2 — Solve $K_p$ so $|L(j\omega_c)| = 1$
+
+$|C_\text{Lead}\,G_{pos,\text{outer}}|(j0.6) = 1.8479$ → $K_p = 1/1.8479 = 0.5411$.
+
+**Full (design-time) controller:**
 
 $$\boxed{\;C_\text{pos}(s) \;=\; 0.5411 \cdot (0.0505\,s + 1)\;}$$
 
-> [!warning] The Lead is improper — Simulink rejects it
-> A pure $(\tau_d s + 1)$ has numerator degree > denominator degree (improper) and Simulink's `Transfer Fcn` block refuses to realise it. Alternatives: (a) proper Lead $(\tau_d s + 1) / (\alpha\tau_d s + 1)$ with small $\alpha$, adding a fast filter pole; (b) derivative-plus-sum parallel structure; (c) drop the Lead and accept a $1.74°$ PM hit.
->
-> **We chose (c).** The firmware runs with $\tau_{d,\text{pos}} = 0$, giving actual PM $\approx 58.3°$. The $25$ dB gain margin dominates robustness here; a sub-$2°$ PM sacrifice is noise.
+But — see the warning below — this doesn't actually make it into Simulink.
 
-**Verification** (design-time, with Lead): $\omega_c = 0.60$ rad/s, $\gamma_M = 60.00°$, $GM = 25.34$ dB (at $7.62$ rad/s), $0$ RHP closed-loop poles. Linear 2 m step: peak velocity $0.760$ m/s ✓ (spec $\geq 0.7$), $2\%$-envelope settling $11.2$ s (slightly past the $10$ s mission window — the mission only requires _reaching_ $2$ m in $10$ s, not settling to $\pm 4$ cm).
+**In MATLAB** (lines 122–123): `magL = squeeze(bode(C_Lead_pos * Gpos_outer, wc_pos)); Kp_pos = 1 / magL;`. Same single-frequency `bode()` trick.
+
+### The Lead drop — why the firmware runs pure P
+
+> [!warning] The ideal Lead is improper — Simulink rejects it
+> A pure $(\tau_d s + 1)$ has **numerator degree > denominator degree** (improper). Physically it's a pure differentiator riding on a constant — and Simulink's `Transfer Fcn` block refuses to realise improper transfer functions because they can't be run as ODEs. Three options:
+>
+> - **(a) Proper Lead** $(\tau_d s + 1)/(\alpha\tau_d s + 1)$ with small $\alpha$. Correct, but adds a fast filter pole that costs a bit of phase back.
+> - **(b) Derivative-plus-sum** parallel structure, using a separate derivative tap. Works, but extra wiring for a tiny phase boost.
+> - **(c) Drop the Lead entirely.** Accept a $1.74°$ PM hit.
+>
+> **We chose (c).** The firmware runs with $\tau_{d,\text{pos}} = 0$, giving actual PM $\approx 58.3°$. The $25$ dB gain margin dominates robustness here — a sub-$2°$ PM sacrifice is in the noise of model uncertainty. The paste block below sets `tdpos = 0` accordingly.
+
+**The aha.** In Tasks 1-3 we either had no Lead or used the gyro shortcut for a "free" ideal Lead (which only works because the gyro *is* the derivative structurally). Task 4 hits a software constraint the lecture cookbook doesn't mention: ideal Leads are OK only when you can implement them structurally, not as stand-alone Simulink blocks. When the required Lead phase is this tiny, "just drop it" is the right engineering call — but it's worth knowing *why* we had to choose, rather than assuming Simulink would accept whatever the math produced.
+
+### Step 3 — Verification
+
+Design-time (with Lead): $\omega_c = 0.60$ rad/s, $\gamma_M = 60.00°$, $GM = 25.34$ dB (at $7.62$ rad/s), $0$ RHP closed-loop poles. Linear 2 m step: peak velocity $0.760$ m/s ✓ (spec $\geq 0.7$), $2\%$-envelope settling $11.2$ s (slightly past the $10$ s mission window — but the mission requires *reaching* $2$ m in $10$ s, not settling to $\pm 4$ cm).
 
 ![[regbot_task4_loop_bode.png]]
-*Open-loop Bode $L = K_P\,C_\text{Lead}\,G_{pos,\text{outer}}$. Title: $Gm = 25.3$ dB, $Pm = 60°$ at $0.6$ rad/s. The phase curve bends back up at higher frequency — the RHP-zero signature.*
+*Open-loop Bode $L = K_P\,C_\text{Lead}\,G_{pos,\text{outer}}$. Title: $Gm = 25.3$ dB, $Pm = 60°$ at $0.6$ rad/s.*
+
+> [!tip]+ How to read this Bode plot
+> Magnitude crossing at $\omega_c = 0.6$ rad/s (designed). Phase at $\omega_c$ reads $-120°$ giving $\gamma_M = 60°$ exactly. Below $\omega_c$, magnitude rises on $-20$ dB/dec — the plant's free integrator dominating. Above $\omega_c$, the phase curve *bends back up* rather than monotonically decreasing — that's the RHP zero at $+8.67$ rad/s doing its signature thing: it adds $+20$ dB/dec of magnitude slope *and* $-90°$ of phase (opposite sign from an LHP zero). The combination is what gives the healthy $25.3$ dB gain margin (magnitude stays well above $0$ dB over a wide range) while keeping the phase from diving into $-180°$ territory.
 
 ![[regbot_task4_step.png]]
-*Linear closed-loop response to a 2 m position step. Reaches $2$ m well inside the mission window; small oscillation before settling.*
+*Linear closed-loop response to a 2 m position step.*
+
+> [!tip]+ How to read this step response
+> Reaches $2$ m well inside the mission window, with a small oscillation before settling — the firmware's $1.74°$ less PM (from dropping the Lead) shows up as slightly more ringing than design-time, but $25$ dB GM keeps it well-behaved. This is the *linear* model; the Simulink sanity sim below runs the full non-linear plant with the $\pm 9$ V limiter and shows ${\sim}7.5\%$ overshoot.
 
 Paste into `regbot_mg.m`:
 
