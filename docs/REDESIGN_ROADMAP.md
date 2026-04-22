@@ -31,7 +31,9 @@ Detailed plan: see Claude's plan file (local to the working machine).
     - [x] Sim peak velocity = 0.753 m/s (spec ≥ 0.7 ✓, tighter than the 0.80 of the old design but hardware should still clear with margin)
     - [x] PM 60.00° (with Lead) → ~57° (without, after drop); GM = 25.17 dB
 - [x] **Phase 5.A** — `config/regbot_group47.ini` updated with all four v3 gain blocks
-- [ ] **Phase 5.B** — Simulink sanity sims (user runs): `startAngle=10` recovery + `topos=2` step
+- [x] **Phase 5.B** — Simulink sanity sims
+    - [x] `startAngle=10` balance recovery: voltage peak 2.8 V (no saturation), pitch 10° → 0° within ~0.3 s, fully settled by t ≈ 2 s. Faster than old design.
+    - [x] 2 m position step: x reaches 2.15 m peak (7.5% overshoot), settles at 2.00 m; **peak velocity ≈ 0.80 m/s** (above 0.7 spec ✓); voltage peak ~3 V; pitch +17° during accel, returns to 0.
 - [ ] **Phase 6** — Hardware validation (Tests 0, 3a, 3b, 4 with `v3_onfloor` suffix)
 - [ ] **Phase 7** — Documentation sweep (`docs/*.md` + Report LaTeX)
 - [ ] **Phase 8** — Merge `day5-redesign` → `main` on both submodules (`--no-ff`), then bump DTU main pointers
@@ -47,3 +49,4 @@ Detailed plan: see Claude's plan file (local to the working machine).
 | 2026-04-22 | 2 | Task 2 re-linearised. Gtilt magnitude peak moved 5.95 → 8.03 rad/s. New tipost = 0.1245, titilt = 0.2000, tdtilt = 0.0442 (**−67%**), Kptilt = 1.1999. PM = 60.00°, settling 1.34 s vs 1.55 before. |
 | 2026-04-22 | 3 | Task 3 re-linearised. RHP zero unchanged at +8.51. New Kpvel = 0.1581 (−2%), tivel = 3.0 (unchanged). PM = 68.98° (up from 64.2°), GM = 5.84 dB. |
 | 2026-04-22 | 4 | Task 4 re-linearised; free v→x integrator still there. New Kppos = 0.5411 (was 0.5335). Lead dropped again (improper TF). Sim peak v = 0.753 m/s (was 0.80), still above 0.7 spec. PM ≈ 57° after Lead drop, GM 25.2 dB. |
+| 2026-04-22 | 5 | regbot_group47.ini updated with all four v3 gains. Simulink sanity sims green: 10° recovery in <2 s (peak V = 2.8, no sat), 2 m step reaches 2.0 m with 7.5% overshoot and peak v ≈ 0.8 m/s. Ready for hardware. |
