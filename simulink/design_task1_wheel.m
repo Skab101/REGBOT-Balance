@@ -2,7 +2,11 @@
 %  Task 1 — Wheel-speed PI controller design
 %  =======================================================================
 %
-%  Plant:    G_vel(s) = 13.34 / (s + 35.71)          (Day 5 black-box ID)
+%  Plant:    G_vel(s) = 2.198 / (s + 5.985)    (Day 5 v2 on-floor ID,
+%            training-wheels, 1-pole tfest fit on averaged L/R data.
+%            Source: data/Day5_results_v2.mat, variable G_1p_avg.
+%            DC gain 0.367 (m/s)/V, pole 5.99 rad/s, tau = 167 ms.)
+%
 %  Specs:    wc = 30 rad/s,  gamma_M >= 60 deg,  Ni = 3
 %  Method:   Place PI zero at wc/Ni; pick Kp so |L(j wc)| = 1.
 %
@@ -10,6 +14,15 @@
 %  designs the controller, prints every intermediate value, generates
 %  the Bode + closed-loop-step plots, and finishes with a copy-pasteable
 %  "Task 1 gains" block you paste back into regbot_mg.m.
+%
+%  HISTORY
+%    2026-04-15  Original design used the Day 4 wheels-up approximation
+%                G = 13.34/(s+35.71). That plant has pole at 35.71 rad/s
+%                (6x faster than the on-floor plant), giving Kp = 3.31
+%                and PM = 121.6 deg. See commit history on `main`.
+%    2026-04-22  day5-redesign branch: switched to the Day 5 v2 on-floor
+%                plant so the design matches the physical operating
+%                condition. Expected Kp ~ 13.2, PM ~ 83 deg at wc = 30.
 %  =======================================================================
 
 close all; clear;
@@ -25,14 +38,21 @@ IMG_DIR = pick_image_dir();
 
 
 %% ----------------------------- Plant -----------------------------------
-Gvel_day5 = 13.34 / (s + 35.71);
+% Load the averaged 1-pole training-wheels on-floor fit from the shared
+% MAT file that lives next to the controller design scripts (data/).
+mat_path = fullfile(fileparts(mfilename('fullpath')), '..', 'data', ...
+    'Day5_results_v2.mat');
+S         = load(mat_path, 'G_1p_avg');
+Gvel_day5 = S.G_1p_avg;   % expected: 2.198 / (s + 5.985)
 
 fprintf('==============================================================\n');
-fprintf('  Task 1 plant: Gvel_day5(s) = voltage -> wheel velocity\n');
+fprintf('  Task 1 plant: Gvel(s) = voltage -> wheel velocity\n');
+fprintf('                (Day 5 v2 on-floor, training wheels)\n');
 fprintf('==============================================================\n');
 print_tf('Gvel_day5', Gvel_day5);
-fprintf('  DC gain = %.3f (m/s)/V   pole = %.2f rad/s   tau = %.3f s\n\n', ...
-        dcgain(Gvel_day5), pole(Gvel_day5), 1/35.71);
+p_plant = pole(Gvel_day5);
+fprintf('  DC gain = %.4f (m/s)/V   pole = %.3f rad/s   tau = %.3f s\n\n', ...
+        dcgain(Gvel_day5), p_plant(1), -1/p_plant(1));
 
 
 %% ----------------------------- Design ----------------------------------
