@@ -260,57 +260,121 @@ Kffwv = 0;
 
 `design_task2_balance`
 
-With Task 1 closed, linearise the Simulink model from `vel_ref` → tilt angle. The result is 7th-order and open-loop unstable:
+### What this loop does
+
+Task 2 stabilises the inverted pendulum — the "keep the broomstick upright" loop. With Task 1 closed, `linearize` from `vel_ref` → tilt angle produces a 7th-order plant $G_{tilt}(s)$ with **one RHP pole at $+9.13$ rad/s** — the pendulum's falling mode. That pole is the plant literally trying to escape: without feedback, the tilt error grows like $e^{9.13\,t}$ ([Lesson 10 §1](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance)). A plain PI-Lead cannot stabilise this — the Nyquist curve won't encircle $(-1, 0)$ in the right direction (Step 1 below). So the design follows [Lecture 10 Method 2](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance): absorb a sign flip into a post-integrator that reshapes the plant's magnitude, then design a standard PI-Lead on top.
+
+**Why Method 2 over Method 1?** Both stabilise the plant, but Method 1 closes an inner P loop and designs the outer controller on $K_{PS}G/(1 + K_{PS}G)$ — which hides the pendulum resonance and phase behaviour inside the closed-loop denominator. Method 2 absorbs *only the sign*, keeping the raw physics visible: the magnitude peak at $\omega \approx 8$ rad/s (pendulum resonance) is *the* feature that tells us where to place the post-integrator zero. For an inverted-pendulum design, Method 2 is almost always the right choice ([Lesson 10 §5.3](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance)).
+
+### The plant
+
+With Task 1 closed, `linearize` on `vel_ref → tilt angle` gives a 7th-order open-loop-unstable $G_{tilt}(s)$:
 
 ![[regbot_Gtilt_pzmap_zoom.png]]
 *$G_{tilt}$ pole-zero map (zoomed to $\pm 50$ rad/s). Orange ring: RHP pole at ${\approx}+9.13$ rad/s — the inverted-pendulum falling mode. Complex LHP pair near $-8\pm 3j$ and zeros at $\pm 8$ reflect the non-minimum-phase geometry.*
 
-DC gain of $G_{tilt}$: $+4.83 \times 10^{-4}$ rad/(m/s). $P = 1$ RHP pole.
+Key features:
 
-Method 2 = **sign flip + post-integrator + outer PI-Lead**. Four steps:
+- **RHP pole at $+9.13$ rad/s** — the falling mode. $P = 1$ for Nyquist bookkeeping.
+- **Complex LHP pair near $-8 \pm 3j$** — a lightly-damped oscillatory mode that shows up as a magnitude peak near $\omega = 8$ rad/s on the Bode plot.
+- **RHP zero at $+8$ rad/s** — non-minimum-phase. To push the body upright, the wheels must briefly move the *wrong way*; this shows up as an initial undershoot in the step / IC response.
+- **DC gain** $+4.83 \times 10^{-4}$ rad/(m/s) — the *sign* matters for Step 1.
+
+### Specifications, translated to the frequency domain
+
+| Spec | Value | What it means |
+|---|---|---|
+| Crossover $\omega_c$ | $15$ rad/s | Above the pendulum resonance at $\omega_\text{peak} \approx 8$ rad/s, so the loop rolls the resonance off — but at least $15\times$ slower than Task 3's $1$ rad/s budget, which is what a stable cascade needs. |
+| Phase margin $\gamma_M$ | $\geq 60°$ | Course default. Task 2 clears this *exactly* at $60.00°$ — the Lead is sized to fill precisely the phase deficit. |
+| $N_i$ | $3$ | Same as Task 1. PI zero at $\omega_c/3 = 5$ rad/s. |
+
+Method 2 is four steps: **sign flip → post-integrator → outer PI-Lead → verify**.
 
 ### Step 1 — Nyquist sign check
 
-DC gain $> 0$ and $P = 1$ require one CCW encirclement of $(-1, 0)$. A positive $K_{PS}$ cannot produce that encirclement, so $\mathrm{sign}(K_{PS}) = -1$, absorbed into the post-integrator.
+**What we do.** Use the plant's DC-gain sign and RHP-pole count to pin down the sign of $K_{PS}$ (the stabilising loop gain). This is the Nyquist bookkeeping from [Lesson 10 §2.3/§3](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance):
+
+$$Z \;=\; N + P$$
+
+$Z$ = closed-loop RHP poles (want $0$); $N$ = net **CW** encirclements of $(-1, 0)$; $P$ = open-loop RHP poles. For $G_{tilt}$, $P = 1$, so we need $N = -1$ — exactly **one CCW** encirclement of $(-1, 0)$.
+
+**The sign-of-$K_{PS}$ question.** A positive $K_{PS}$ only scales the Nyquist curve radially about the origin — it cannot change the winding direction. With DC gain $> 0$, the Nyquist curve starts out on the positive real axis heading rightward, and no amount of positive scaling drags it CCW around $(-1, 0)$. **Therefore sign($K_{PS}$) = $-1$**: a negative gain *flips* the curve through the origin (adds $180°$ rotation), which turns the would-be CW encirclement into a CCW one. That minus sign gets absorbed into the post-integrator in Step 2.
+
+**The aha.** "Stabilising an unstable plant" in the complex plane means dragging the closed-loop pole from RHP to LHP — and that's precisely what a CCW encirclement of $(-1)$ produces. The Nyquist curve's starting direction (set by the DC-gain sign) decides whether positive gain alone can achieve this; for REGBOT it can't, so the sign flip is *forced*, not chosen.
+
+**In MATLAB** (lines 99–117). Script grids $\omega \in [10^{-2}, 10^4]$ rad/s, reads `dcgain(Gtilt) = +4.83e-4`, and because `dc > 0` sets `sign_K = -1`. Prints `"DC gain > 0 AND P = 1 => need sign(K_PS) = -1"`.
 
 ### Step 2 — Post-integrator
 
-$|G_{tilt}|$ peaks at $\omega_{\text{peak}} = 8.170$ rad/s (value $0.7068$). Place the PI zero there so the magnitude rolls off monotonically beyond the peak:
+**What we do.** Place a PI zero at the frequency where $|G_{tilt}(j\omega)|$ peaks. This does two things at once: it *reshapes* the magnitude curve to decrease monotonically beyond the peak, and (with the sign flip from Step 1) produces the one CCW Nyquist encirclement of $(-1)$ that stabilises the loop.
 
-$$\tau_{i,\text{post}} \;=\; \frac{1}{\omega_{\text{peak}}} \;=\; 0.1224\,\mathrm{s},
+**Find the peak.** Script evaluates $|G_{tilt}|$ on a log grid and picks the max:
+
+| Quantity | Value |
+|---|---|
+| $\omega_\text{peak}$ | $8.170$ rad/s |
+| $|G_{tilt}(j\omega_\text{peak})|$ | $0.7068$ |
+
+**Build the post-integrator.** Set $\tau_{i,\text{post}} = 1/\omega_\text{peak}$ so the PI zero lands right on the peak:
+
+$$\tau_{i,\text{post}} \;=\; \frac{1}{\omega_\text{peak}} \;=\; 0.1224\,\mathrm{s},
 \qquad
 C_{PI,\text{post}}(s) \;=\; \frac{\tau_{i,\text{post}}\,s + 1}{\tau_{i,\text{post}}\,s},
 \qquad
-G_{tilt,\text{post}}(s) \;=\; -C_{PI,\text{post}}(s)\,G_{tilt}(s).$$
+G_{tilt,\text{post}}(s) \;=\; -\,C_{PI,\text{post}}(s)\,G_{tilt}(s).$$
+
+The minus sign is the sign flip from Step 1.
 
 ![[regbot_task2_bode_post.png]]
-*$G_{tilt}$ (blue) vs $G_{tilt,\text{post}}$ (orange). Placing the PI zero at the magnitude peak flattens it and forces a monotonic roll-off beyond — the precondition Method 2 needs before designing the outer loop.*
+*$G_{tilt}$ (blue) vs $G_{tilt,\text{post}}$ (orange). Placing the PI zero at the magnitude peak flattens it and forces a monotonic roll-off beyond.*
+
+> [!tip]+ How to read this Bode plot
+> Blue curve ($G_{tilt}$) has a hump near $\omega = 8$ rad/s — the resonance from the LHP pair at $-8 \pm 3j$. Orange curve ($G_{tilt,\text{post}}$) is flat-then-falling through the same region. What happened: the PI zero at $1/\tau_{i,\text{post}} = 8.17$ rad/s adds $+20$ dB/dec slope above itself, which cancels the $+20$ dB/dec rise into the resonance. Past the peak, the integrator's $-20$ dB/dec takes over and the magnitude rolls off monotonically. This is the precondition the outer PI-Lead design needs — a plant with no hills.
 
 ![[regbot_task2_nyquist_post.png]]
-*Nyquist of $G_{tilt,\text{post}}$. One CCW encirclement of $(-1, 0)$, matching $P = 1$ — the post-integrated plant is stabilisable by a standard outer controller.*
+*Nyquist of $G_{tilt,\text{post}}$. One CCW encirclement of $(-1, 0)$.*
+
+> [!tip]+ How to read this Nyquist plot
+> The curve wraps once *counter-clockwise* around the critical point $(-1, 0)$ — that's $N = -1$. With $P = 1$ open-loop RHP pole, $Z = N + P = 0$: zero closed-loop RHP poles, i.e. the post-integrated plant is stabilisable by any well-behaved outer controller. Without the sign flip from Step 1, the curve would wind *clockwise* instead, giving $Z = 2$ and making the closed loop worse than the open one.
+
+**The aha.** The post-integrator's integrator isn't about zero steady-state error (though it does lift $G_{tilt,\text{post}}$ to Type-1). Its real job is *magnitude reshaping*: placing the zero at $\omega_\text{peak}$ cancels the rising slope just below the peak so the integrator's $-20$ dB/dec can dominate immediately after. Combined with the sign flip, it also produces the required CCW encirclement. Two birds, one PI.
+
+**In MATLAB** (lines 120–147). `[mag_peak, k_peak] = max(mag_g)` finds the peak, `tau_ip = 1/w_grid(k_peak)`, and `Gtilt_post = sign_K * C_PI_post * Gtilt` assembles the sign-flipped stabilised plant.
 
 ### Step 3 — Outer PI-Lead on $G_{tilt,\text{post}}$
 
-**Specs:** $\omega_c = 15$ rad/s, $\gamma_M = 60°$, $N_i = 3$. PI zero: $\tau_i = 3/15 = 0.200$ s.
+Now design a normal PI-Lead on the well-behaved $G_{tilt,\text{post}}$ — same phase-balance recipe as Task 1.
+
+**PI zero:** $\tau_i = N_i/\omega_c = 3/15 = 0.200$ s.
 
 **Phase balance at $\omega_c = 15$ rad/s:**
 
-| Contribution | Value |
-|---|---|
-| $\angle G_{tilt,\text{post}}(j15)$ | $-135.81°$ |
-| $\angle C_{PI}(j15)$ | $-18.43°$ |
-| $\phi_\text{Lead}$ required | $+34.25°$ |
+| Term | Value | Where it comes from |
+|---|---|---|
+| $\angle G_{tilt,\text{post}}(j15)$ | $-135.81°$ | 7th-order plant — phase has accumulated heavily by $\omega = 15$ |
+| $\phi_{PI} = \arctan(3) - 90°$ | $-18.43°$ | Same as Task 1 — standard $N_i = 3$ cost |
+| $\phi_\text{Lead}$ required | $+34.25°$ | $(60° - 180°) - (-135.81°) - (-18.43°) = +34.25°$ |
 
-**Lead from the gyro.** The gyro measures $\dot\theta$ directly, so $\tau_d\,\dot\theta + \theta = (\tau_d s + 1)\,\theta$ realises an ideal $(\tau_d s + 1)$ Lead with no filter pole:
+Unlike Task 1's negative required Lead (meaning no Lead), Task 2 needs a **substantial positive boost** — the plant's higher-order phase accumulation has to be fought off at $\omega_c$.
 
-$$\tau_d \;=\; \frac{\tan 34.25°}{15} \;=\; 0.0454\,\mathrm{s}.$$
+**The gyro shortcut.** A standard Lead $(\tau_d s + 1)/(\alpha\tau_d s + 1)$ needs an $\alpha < 1$ filter pole to keep noise amplification from an ideal differentiator finite ([Fundamentals §10.3](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory)). But REGBOT's gyro **directly measures** $\dot\theta$. That lets us implement:
 
-**Gain.** $|C_{PI}\,C_\text{Lead}\,G_{tilt,\text{post}}|(j15) = 0.8424$ → $K_P = 1/0.8424 = 1.1871$.
+$$\tau_d \cdot \dot\theta + \theta \;=\; (\tau_d s + 1)\,\theta$$
+
+which is an *ideal* Lead $(\tau_d s + 1)$ with no filter pole at all — the gyro is a pre-existing clean derivative, so no numerical differentiation is needed and the noise doesn't blow up ([Lesson 10 §7.3](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance)). **The aha:** this is free phase margin. Any non-REGBOT plant would pay extra phase lag from the $\alpha$-filter; we skip it entirely.
+
+From $\phi_\text{Lead} = +34.25°$ at $\omega_c = 15$:
+
+$$\tau_d \;=\; \frac{\tan 34.25°}{15} \;=\; 0.0454\,\mathrm{s}$$
+
+**Gain from $|L(j\omega_c)| = 1$:** $|C_{PI}\,C_\text{Lead}\,G_{tilt,\text{post}}|(j15) = 0.8424$ → $K_p = 1/0.8424 = 1.1871$.
 
 $$\boxed{\;C_\text{tilt}(s) \;=\; -\,1.1871 \cdot \frac{0.1224\,s + 1}{0.1224\,s} \cdot \frac{0.2\,s + 1}{0.2\,s} \cdot (0.0454\,s + 1)\;}$$
 
 ![[regbot_simulink_tilt_controller.png]]
-*Simulink wiring of `Tilt_Controller`. Inputs: pitch (port 1), gyro (port 2), $\theta_\text{ref}$ (port 3). The gyro is scaled by $K = \tau_d = $ `tdtilt` and added to pitch — this is the gyro-based ideal Lead $(\tau_d s + 1)\,\theta$ with no filter pole. The error $\theta_\text{ref} - (\tau_d s + 1)\,\theta$ then passes through the $-1$ sign-flip (Method 2 Step 1), the post-integrator `(tipost·s+1)/(tipost·s)` (Step 2), the outer PI `(titilt·s+1)/(titilt·s)` (Step 3), and a final gain $K_{ptilt}$ to produce $v_\text{ref}$ (output port 1). The Lead sits on the **feedback path before the error sum** so the full controller is $C_\text{total} = K_P \cdot (-C_{PI,\text{post}}) \cdot C_{PI} \cdot (\tau_d s + 1)$ in series, not a parallel add — the parallel topology was tried first and didn't give the intended phase boost at $\omega_c$.*
+*Simulink wiring of `Tilt_Controller`. Inputs: pitch (port 1), gyro (port 2), $\theta_\text{ref}$ (port 3). The gyro is scaled by $K = \tau_d = $ `tdtilt` and added to pitch — this is the gyro-based ideal Lead $(\tau_d s + 1)\,\theta$ with no filter pole. The error $\theta_\text{ref} - (\tau_d s + 1)\,\theta$ then passes through the $-1$ sign-flip (Step 1), the post-integrator `(tipost·s+1)/(tipost·s)` (Step 2), the outer PI `(titilt·s+1)/(titilt·s)` (Step 3), and a final gain $K_{ptilt}$ to produce $v_\text{ref}$. The Lead sits on the **feedback path before the error sum**, so the full controller is $C_\text{total} = K_P \cdot (-C_{PI,\text{post}}) \cdot C_{PI} \cdot (\tau_d s + 1)$ in series, not a parallel add — the parallel topology was tried first and didn't produce the intended phase boost at $\omega_c$.*
+
+**In MATLAB** (lines 150–211). Script prints each intermediate value: `phi_G`, `phi_PI`, `phi_Lead`, `tau_d`, `magL`, `Kp_tilt`. The `C_total_tilt = Kp_tilt * sign_K * C_PI_post * C_PI_tilt * C_Lead` line assembles the full cascade as a single transfer function for verification.
 
 ### Step 4 — Verification
 
@@ -319,20 +383,26 @@ From `margin(L_tilt)`:
 | Metric | Value | |
 |---|---|---|
 | Achieved $\omega_c$ | $15.00$ rad/s | ✓ |
-| Phase margin | $60.00°$ | ✓ |
-| Gain margin | $-5.44$ dB (at $5.73$ rad/s) | see note below |
+| Phase margin | $60.00°$ | ✓ exactly |
+| Gain margin | $-5.44$ dB (at $5.73$ rad/s) | see callout |
 | Closed-loop RHP poles | $0$ | ✓ stable |
 | Linear IC ($\theta_0 = 10°$) settling ($2\%$ env.) | $1.35$ s | |
-| Peak undershoot | $6.71°$ | |
+| Peak undershoot | $6.71°$ | RHP-zero signature |
 
 > [!note] Why a negative gain margin is not a bug
-> For a plant with $P = 1$ RHP pole, `margin` reports the gain margin as a **lower** bound: the minimum factor by which the loop gain may be reduced before stability is lost. A negative $GM$ in dB on an unstable plant is the expected signature; positive $GM$ would indicate a design error.
+> For a plant with $P = 1$ RHP pole, `margin` reports the gain margin as a **lower** bound: the minimum factor by which the loop gain can be *reduced* before stability is lost (not *increased*, which is the stable-plant convention). A negative $GM$ in dB on an unstable plant is therefore the expected signature. A *positive* $GM$ would mean reducing the loop gain couldn't destabilise the plant — which is impossible if the plant was unstable to begin with. So: negative $GM$ = correct design; positive $GM$ = bug.
 
 ![[regbot_task2_loop_bode.png]]
-*Open-loop Bode $L = K_P\,C_{PI}\,C_\text{Lead}\,G_{tilt,\text{post}}$. Crossover at $15$ rad/s with $60°$ PM; gain-margin crossing at $5.73$ rad/s where the phase dips through $-180°$.*
+*Open-loop Bode $L = K_P\,C_{PI}\,C_\text{Lead}\,G_{tilt,\text{post}}$. Crossover at $15$ rad/s with $60°$ PM.*
+
+> [!tip]+ How to read this Bode plot
+> Magnitude crossing at $\omega_c = 15$ rad/s (designed value) — the `margin()` title confirms it. Phase at that point is $-120°$, giving $\gamma_M = 180° - 120° = 60°$ exactly. Below $\omega_c$ the magnitude rises steeply — two integrators stacked (post-integrator + outer PI) on top of the plant's gain. Above $\omega_c$ the magnitude falls faster than Task 1's because the plant's higher-order poles have kicked in. The phase crosses $-180°$ at $\omega = 5.73$ rad/s (below $\omega_c$) — that's where `margin()` reports the negative gain margin. Above $\omega_c$ the phase stays above $-180°$ thanks to the Lead zero at $1/\tau_d \approx 22$ rad/s, which is why the closed loop is stable despite the RHP pole.
 
 ![[regbot_task2_ic_response.png]]
-*Linear-model response on the closed pitch loop to $\theta_0 = 10°$ initial disturbance.*
+*Linear-model response to a $\theta_0 = 10°$ initial tilt disturbance.*
+
+> [!tip]+ How to read this response
+> Small-angle linear prediction of recovery from a $10°$ tilt at $t = 0$. Peak undershoot ${\sim}6.7°$ — pitch goes *negative* before settling. That's the RHP zero at $+8$ rad/s doing what RHP zeros do: to drive the body upright, the wheels must first roll the *wrong way* briefly before the body can accelerate back up. Settles within $\pm 2\%$ of zero by $t \approx 1.35$ s. This is the *linear* model; the Simulink sanity sim below runs the full non-linear Simscape Multibody plant with the $\pm 9$ V limiter.
 
 Paste into `regbot_mg.m`:
 
