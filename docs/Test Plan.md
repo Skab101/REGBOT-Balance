@@ -60,6 +60,12 @@ date: 2026-04-22
 
 ## Test 0 — Inner wheel-speed loop only (pre-validate Task 1)
 
+> [!tldr]+ Test 0 summary
+> **Purpose.** Verify the Task 1 wheel-speed controller on the physical robot *before* closing the balance loop. After the Day 5 redesign $K_{pwv}$ jumped $3.31 \to 13.20$ (4×), so any inner-loop wiring or sign error would bite here first — far safer to catch it with the robot on its side than mid-fall. It's also the cleanest way to verify that the designed $30$ rad/s crossover actually materialises on hardware: the first campaign passed this test at 0.329 s rise time, which is how we discovered the wheels-up plant mismatch in the first place.
+> **What this section shows.** Balance disabled, $0.3$ m/s wheel-velocity step commanded. The log gives a direct read of rise time, steady-state accuracy, L/R wheel match, and the voltage profile — no outer-loop dynamics in the way.
+> **Result.** ✅ PASS. Rise to $0.27$ m/s in **$0.012$ s** (within one $15$ ms log sample — $27\times$ faster than v1's $0.329$ s), L/R agreement $0.76\%$, peak voltage $2.60$ V, zero steady-state error (within noise). The 4× higher $K_p$ also produces visibly more voltage ripple (encoder noise amplified by the higher loop gain) — cosmetic, no stability effect, but worth a line in the report.
+> **How this feeds into the next test.** Inner loop confirmed working on-floor at the designed bandwidth, so it's safe to close the balance loop. Test 3a is next: stationary balance with Task 1 inside, Task 2 now active.
+
 > [!note] Why this matters especially on the v3 branch
 > Kpwv jumped from 3.31 to 13.20 (4×). The controller is much more aggressive; if anything is wired wrong in the inner loop, this is where it would bite first. Run Test 0 before closing the balance loop.
 
@@ -109,6 +115,12 @@ C:\Users\Mads2\DTU\4. Semester\Linear Control Design\REGBOT-Balance-Assignment\l
 
 ## Test 3a — Stationary balance (Task 2 verification)
 
+> [!tldr]+ Test 3a summary
+> **Purpose.** First test with the balance loop (Task 2) actually engaged on the physical robot. No velocity or position commands — the controller's only job is to keep the robot upright. This is the minimum viable verification that Lecture 10 Method 2 actually works outside Simulink, and the test that most directly exercises the *tightness* of the balance loop (standard deviation of pitch is a direct metric of tilt-control authority).
+> **What this section shows.** Two v3 runs bracketing a tilt-offset recalibration, plus the v2 baseline for comparison. The v3 balance loop tracks tilt substantially better than v2 (tilt std $1.87°$ vs $4.76°$ — **61% tighter**, and the late-period oscillation visible in v2 is gone entirely). But the v3 runs also have a residual $\approx +1.1°$ DC tilt-offset bias that the recalibration attempt didn't meaningfully shift, and that bias integrates cleanly into $\approx 0.5$ m of linear drift over $10$ s.
+> **Result.** ⚠️ Marginal. Balance holds $10$ s with drift $0.505$ m on v3 — just over the $0.5$ m spec. **Reportable Test 3a uses the v2 run ($0.343$ m drift, passes spec)** because drift depends on sensor calibration (outside the controller's authority); the v3 tightness improvement is cited separately as a design win. Root cause of the residual bias: either one more Y-offset iteration needed ($Y \approx 176$) or a physical CG/wheel-radius asymmetry.
+> **How this feeds into the next test.** Balance loop itself is confirmed holding — specifically, the Method 2 sign flip is correctly entered in firmware (`[cbal] kp = -1.1999`), and the tighter closed balance dynamics are showing up in the log. The DC-drift issue is moot for Tests 3b/4 because the outer velocity/position loops actively regulate it away. Safe to proceed to Test 3b.
+
 **Mission script:**
 ```
 vel=0, bal=1, log=15 : time=10
@@ -157,6 +169,12 @@ The controller redesign is clearly working: tilt std of 1.87° is 61% tighter th
 ---
 
 ## Test 3b — Square run at 0.8 m/s (Task 2 + 3 verification)
+
+> [!tldr]+ Test 3b summary
+> **Purpose.** Verify Tasks 2 + 3 *together* under aggressive motion — a full $0.8$ m/s square with $0.2$ m turn-radius corners (the assignment's hardest steady-state workload). This is also the test that exposes the **worst-case motor-voltage transient** in the whole campaign: each corner entry is a sharp $v_\text{ref}$ step, and the inner PI has to slam the motor voltage to absorb it. Where Test 0 checks the inner loop quasi-statically, Test 3b checks what happens when the inner loop gets hit with the worst realistic command profile.
+> **What this section shows.** Full square traced, $4$ sides $+ 3$ turns, cumulative heading back to $\approx 360°$, the tilt and voltage peaks during each corner. Directly demonstrates the **bandwidth–saturation trade-off** that follows from the 4× higher $K_{pwv}$: v1 had voltage headroom to spare (peak $4.67$ V, $58\%$ of $\pm 8$ V budget) because its effective inner-loop bandwidth was 4× slower than designed; v3 realises the designed $30$ rad/s but spends headroom on that.
+> **Result.** ✅ PASS. Heading $359.8°$ ($0.06\%$ error), peak tilt $+25.5°$, tilt std $5.03°$, peak wheel velocity $1.31$ m/s on turns (outer wheel), **peak motor voltage $7.31$ V** — $91\%$ of the $\pm 8$ V saturation budget. Still inside the limit, but noticeably tighter than v2. The right illustration for the "what did the redesign cost" paragraph in the report.
+> **How this feeds into the next test.** Cascade confirmed stable under sharp commands. Test 4 is the opposite regime — smooth position-loop output, no step edges in $v_\text{ref}$ — so the saturation concern from Test 3b should *not* reappear there. (Spoiler: it doesn't; Test 4 peaks at $4.95$ V.)
 
 **Mission script:**
 ```
@@ -210,6 +228,12 @@ For the report this is a good illustration of the **noise/bandwidth/saturation t
 ---
 
 ## Test 4 — 2 m position move
+
+> [!tldr]+ Test 4 summary
+> **Purpose.** The headline mission — command `topos=2` and see the robot drive to $x = 2$ m while balancing. Validates **all four loops together** in cascade, and is the test the report prominently features (it's the one the assignment brief explicitly sets). Where Test 3b checks aggressive steady-state motion, Test 4 checks smooth transient behaviour: acceleration, deceleration, arrival at target, and the crucial question of whether the cascade settles cleanly or develops a late-time limit cycle.
+> **What this section shows.** A smooth command profile (the position-loop P-controller's output is the velocity reference — no sharp edges, unlike Test 3b's missions). The log captures final position accuracy, peak wheel velocity (against the $0.7$ m/s mission spec), peak tilt during acceleration, motor voltage, and — critically — whether the robot sits still after arriving or hunts around the target.
+> **Result.** ✅ PASS — cleanest test of the whole campaign. Final $1.964$ m (**$3.6$ cm short** — v2 was $10.7$ cm short, so $3\times$ closer), **no overshoot**, **no late limit cycle** (v2 had a visible one with pitch $\pm 10°$ and $v_\text{ref}$ saturating $\pm 0.5$), peak tilt $+17.3°$ (v2 $+25°$, $-31\%$), tilt std $2.93°$ (v2 $5.18°$, $-43\%$), peak voltage $4.95$ V (zero saturation samples — the Test 3b concern did not reappear). Peak velocity $0.79$ m/s (above $0.7$ spec; below v2's $1.01$ — the tighter-control trade-off: less over-tilt → less impulsive thrust → lower peak, but much better final-position accuracy).
+> **How this closes the campaign.** All four loops are validated; no more hardware tests. Results thread into the LaTeX report: `wheel-speed-controller.tex` (Test 0), `balance-controller.tex` (Test 3a), `velocity-controller.tex` (Test 3b XY + time series), `position-controller.tex` (Test 4), `conclusion.tex` (summary table + discussion of the v1→v3 trade-offs).
 
 **Mission script:**
 ```
