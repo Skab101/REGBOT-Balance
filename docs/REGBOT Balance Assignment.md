@@ -92,6 +92,14 @@ See the _Day 5 redesign_ note at the bottom for why on-floor identification was 
 
 ## Task 1 — Wheel-speed PI
 
+> [!tldr]+ Task 1 summary
+> **Script:** `design_task1_wheel` — reads `G_1p_avg` from `data/Day5_results_v2.mat`.
+> **Plant:** $G_{vel}(s) = 2.198 / (s + 5.985)$ (Day 5 on-floor).
+> **Specs:** $\omega_c = 30$ rad/s, $\gamma_M \geq 60°$, $N_i = 3$.
+> **Phase balance at $\omega_c$:** plant $-78.7°$, PI $-18.4°$ → natural $\gamma_M = 82.9°$, no Lead needed.
+> **Result:** $K_p = 13.2037$, $\tau_i = 0.100$ s; achieved $\omega_c = 30.00$, $\gamma_M = 82.85°$, $GM = \infty$.
+> **Commit:** `Kpwv = 13.2037; tiwv = 0.1000; Kffwv = 0;`
+
 `design_task1_wheel`
 
 **Specs:** $\omega_c = 30$ rad/s, $\gamma_M \geq 60°$, $N_i = 3$.
@@ -123,6 +131,16 @@ Kffwv = 0;
 ---
 
 ## Task 2 — Balance (Lecture 10 Method 2)
+
+> [!tldr]+ Task 2 summary
+> **Script:** `design_task2_balance` — linearises the Simulink model with Task 1 closed.
+> **Plant:** 7th-order $G_{tilt}(s) = v_{ref} \to$ tilt, $P = 1$ RHP pole at $+9.13$ rad/s (pendulum falling mode).
+> **Method 2 = sign flip + post-integrator + PI-Lead.** Four steps:
+> 1. **Sign:** DC gain $> 0$ and $P = 1$ require CCW encirclement → $\mathrm{sign}(K_{PS}) = -1$, absorbed into the post-integrator.
+> 2. **Post-integrator:** $|G_{tilt}|$ peak at $8.17$ rad/s → $\tau_{i,\text{post}} = 0.1224$ s; flattens the peak.
+> 3. **Outer PI-Lead on $G_{tilt,\text{post}}$:** $\omega_c = 15$, $\gamma_M = 60°$, $N_i = 3$ → $\tau_i = 0.200$, $\phi_{\text{Lead}} = +34.25°$, gyro-based $\tau_d = 0.0454$, $K_P = 1.1871$.
+> 4. **Verification:** $\omega_c = 15.00$, $\gamma_M = 60.00°$, $GM = -5.44$ dB (lower bound, $P = 1$ — normal), $0$ RHP closed-loop poles.
+> **Commit:** `Kptilt = 1.1871; titilt = 0.2000; tdtilt = 0.0454; tipost = 0.1224;` (firmware `[cbal] kp` is entered negative — Method 2 sign flip).
 
 `design_task2_balance`
 
@@ -220,6 +238,14 @@ See the _firmware sign_ note at the bottom for why `[cbal] kp` is entered as neg
 
 ## Task 3 — Velocity PI
 
+> [!tldr]+ Task 3 summary
+> **Script:** `design_task3_velocity` — linearises with Tasks 1 + 2 closed.
+> **Plant:** 9th-order $G_{vel,\text{outer}}(s) = \theta_{ref} \to v$. $0$ RHP poles (balance stabilised it), $1$ RHP zero at $+8.67$ rad/s (physics — non-minimum-phase balancing), free integrator at the origin.
+> **Bandwidth capped by the RHP zero:** rule of thumb $\omega_c \leq z/5 \approx 1.70$ rad/s → pick $\omega_c = 1$ for safety.
+> **Specs:** $\omega_c = 1$ rad/s, $\gamma_M \geq 60°$, $N_i = 3$ → $\tau_i = 3.000$ s. Natural $\gamma_M \approx 69°$ with PI alone, no Lead needed.
+> **Result:** $K_P = 0.1532$; achieved $\omega_c = 1.00$, $\gamma_M = 68.98°$, $GM = 6.21$ dB.
+> **Commit:** `Kpvel = 0.1532; tivel = 3.0000;`
+
 `design_task3_velocity`
 
 With Tasks 1 + 2 closed, linearise `θ_ref` → `wheel_vel_filter`. Result is 9th-order:
@@ -255,6 +281,15 @@ tivel = 3.0000;
 ---
 
 ## Task 4 — Position P (+ tiny Lead, dropped for Simulink)
+
+> [!tldr]+ Task 4 summary
+> **Script:** `design_task4_position` — linearises with Tasks 1 + 2 + 3 closed.
+> **Plant:** 11th-order $G_{pos,\text{outer}}(s) = x_{ref} \to x$. $0$ RHP poles, $1$ RHP zero at $+8.67$ rad/s (inherited from T3), free integrator at the origin (velocity → position) → Type-1 plant, pure P is enough for zero step-tracking error.
+> **Specs:** $\omega_c = 0.6$ rad/s (iterated to clear peak-velocity spec $v > 0.7$ m/s on a $2$ m move).
+> **Phase balance:** $\phi_G(j0.6) = -121.74°$ → Lead needed $+1.74°$, i.e.\ $\tau_d = 0.0505$ s (ideal).
+> **Lead dropped** in firmware: $(\tau_d s + 1)$ is improper and Simulink's `Transfer Fcn` rejects it. $1.74°$ PM cost accepted; $25$ dB gain margin dominates robustness.
+> **Result:** $K_P = 0.5411$; achieved $\omega_c = 0.60$, $\gamma_M = 60.00°$ (with ideal Lead) or $\approx 58.3°$ (without, firmware), $GM = 25.34$ dB. Sim 2 m step: peak $v = 0.760$ m/s ✓.
+> **Commit:** `Kppos = 0.5411; tdpos = 0;` (Lead dropped).
 
 `design_task4_position`
 
