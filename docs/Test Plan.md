@@ -77,23 +77,33 @@ vel=0
 - Time, motor voltage (both wheels), wheel velocity (both), commanded velocity
 
 **Pass criteria:**
-- [ ] Wheel velocity reaches 0.27 m/s within ~0.10 s (vs 0.33 s in v1 — the design crossover is now 30 rad/s on-floor, so rise should be ~4× faster than v1)
-- [ ] Zero steady-state error
-- [ ] Both wheels agree within ~5%
-- [ ] Motor voltage stays within ±8 V (likely higher initial spike than v1 due to Kp jump)
+- [x] Wheel velocity reaches 0.27 m/s within ~0.10 s (vs 0.33 s in v1) — **0.012 s measured**
+- [x] Zero steady-state error — **1% err, within noise**
+- [x] Both wheels agree within ~5% — **0.76%**
+- [x] Motor voltage stays within ±8 V — **peak 2.60 V**
 
 **Log file — full absolute path to paste into the GUI:**
 ```
 C:\Users\Mads2\DTU\4. Semester\Linear Control Design\REGBOT-Balance-Assignment\logs\test0_wheel_speed_v3_onfloor_2026-04-22.txt
 ```
 
-**Notes (post-test):**
-- Rise time:
-- L / R mean:
-- L vs R diff:
-- Voltage peak:
-- Comparison to v1 baseline:
-- Plot: `figures/test0_wheel_speed_v3_onfloor_2026-04-22.png`
+**Notes (post-test):** ✅ **PASS (2026-04-22)**
+
+| Metric | Spec / v1 baseline | v3 measured |
+|---|---|---|
+| Rise time to 0.27 m/s | ~0.08 s target, v1 0.329 s | **0.012 s** (27× faster than v1; within one 15 ms log sample) |
+| L mean (0.5–2.9 s) | 0.3 m/s | 0.2997 m/s (err −0.1%) |
+| R mean | 0.3 m/s | 0.2975 m/s (err −0.8%) |
+| L vs R diff | <5% | 0.76% |
+| Voltage peak | <±8 V | 2.60 V (v1 peak 1.93 V) |
+| Initial voltage dip | — | −0.66 V (transient reaction to the step) |
+
+**Observations:**
+- The 4× higher Kp (3.31 → 13.20) produces visibly more voltage ripple in steady state (~0.6 V peak-to-peak vs ~0.3 V on v1). This is encoder quantisation noise amplified by the higher loop gain. Wheel velocity still tracks the mean perfectly; no saturation; stability not affected. Classic speed/noise tradeoff — worth a note in the report.
+- Rise time is now below the log sampling resolution, consistent with the designed 30 rad/s crossover actually materialising on hardware (v1 hidden effective wc was ≈ 9 rad/s because of the plant-model mismatch).
+
+![[test0_wheel_speed_v3_onfloor_2026-04-22.png]]
+*Test 0 v3 with v1 faint overlay. Top: wheel velocities vs reference — v3 hits target in one log sample, v1 took ~0.33 s. Middle: motor voltages — v3 has higher peak and more ripple. Bottom: tracking error.*
 
 ---
 

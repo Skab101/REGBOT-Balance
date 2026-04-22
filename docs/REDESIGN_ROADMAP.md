@@ -38,8 +38,8 @@ Detailed plan: see Claude's plan file (local to the working machine).
     - [x] Simulink sanity-sim screenshots moved into `figures/` and `docs/images/`:
           `regbot_task2_sim_recovery_10deg_v3.png`, `regbot_task4_sim_step_v3.png`
     - [x] `docs/Test Plan.md` prepared — pre-flight checklist, mission scripts, pass criteria, slots for post-test notes, v2-baseline comparisons baked in
-    - [ ] Load v3 ini into GUI → send → save to robot flash
-    - [ ] Test 0 v3
+    - [x] Load v3 ini into GUI → send → save to robot flash
+    - [x] **Test 0 v3: PASS** — rise to 0.27 m/s in **0.012 s** (v1 was 0.329 s, 27× improvement), peak V = 2.60 V, L/R match 0.76%
     - [ ] Test 3a v3
     - [ ] Test 3b v3
     - [ ] Test 4 v3
@@ -58,3 +58,4 @@ Detailed plan: see Claude's plan file (local to the working machine).
 | 2026-04-22 | 3 | Task 3 re-linearised. RHP zero unchanged at +8.51. New Kpvel = 0.1581 (−2%), tivel = 3.0 (unchanged). PM = 68.98° (up from 64.2°), GM = 5.84 dB. |
 | 2026-04-22 | 4 | Task 4 re-linearised; free v→x integrator still there. New Kppos = 0.5411 (was 0.5335). Lead dropped again (improper TF). Sim peak v = 0.753 m/s (was 0.80), still above 0.7 spec. PM ≈ 57° after Lead drop, GM 25.2 dB. |
 | 2026-04-22 | 5 | regbot_group47.ini updated with all four v3 gains. Simulink sanity sims green: 10° recovery in <2 s (peak V = 2.8, no sat), 2 m step reaches 2.0 m with 7.5% overshoot and peak v ≈ 0.8 m/s. Ready for hardware. |
+| 2026-04-22 | 6 | **Test 0 v3 PASS.** Rise to 0.27 m/s in 0.012 s (vs 0.329 s in v1 — 27× faster). L/R 0.76% match. Voltage peak 2.60 V, ripple higher than v1 (noise/bandwidth tradeoff from Kp = 13.2). Design crossover of 30 rad/s finally materialises on hardware. |
