@@ -200,38 +200,25 @@ First attempt: Day 4 wheels-up identification gave $K_{pwv} = 3.31$ with 121.6°
 | Task | Controller | Plant used (v3) | $\omega_c$ | $\gamma_M$ | Gains |
 |---|---|---|---|---|---|
 | 1 — Wheel speed | PI | `2.198/(s+5.985)` (Day 5 v2 on-floor) | 30.00 rad/s | 82.85° | $K_{pwv} = 13.2037$, $\tau_{iwv} = 0.1000$ s |
-| 2 — Balance | PILead + Post-PI | `Gtilt` re-linearised (1 RHP pole +8.89) | 15.00 rad/s | 60.00° | $K_{ptilt} = 1.1999$, $\tau_{itilt} = 0.2000$ s, $\tau_{dtilt} = 0.0442$ s, $\tau_{ipost} = 0.1245$ s |
-| 3 — Velocity | PI | `Gvel,outer` (RHP zero +8.51) | 1.00 rad/s | 68.98° | $K_{pvel} = 0.1581$, $\tau_{ivel} = 3.0000$ s |
-| 4 — Position | P | `Gpos,outer` (free integrator) | 0.60 rad/s | ~57° | $K_{ppos} = 0.5411$ |
+| 2 — Balance | PILead + Post-PI | `Gtilt` re-linearised (1 RHP pole $\approx +9.13$) | 15.00 rad/s | 60.00° | $K_{ptilt} = 1.1871$, $\tau_{itilt} = 0.2000$ s, $\tau_{dtilt} = 0.0454$ s, $\tau_{ipost} = 0.1224$ s |
+| 3 — Velocity | PI | `Gvel,outer` (RHP zero $+8.67$) | 1.00 rad/s | 68.98° | $K_{pvel} = 0.1532$, $\tau_{ivel} = 3.0000$ s |
+| 4 — Position | P + Lead | `Gpos,outer` (1 free integrator) | 0.60 rad/s | 60.00° (Lead in; 58.3° if Lead dropped for Simulink) | $K_{ppos} = 0.5411$, $\tau_{dpos} = 0.0505$ s |
 
-Firmware sign: `[cbal] kp = -1.1999` (the firmware Balance block does not absorb the Lecture-10 Method-2 sign internally — finding from the v1 campaign, still applies).
+Values above are from the 2026-04-22 fresh MATLAB design runs (the plots in Tasks 1–4 come from this run). The firmware `config/regbot_group47.ini` and the committed `regbot_mg.m` may carry slightly older decimals from earlier runs in the same campaign (e.g.\ $K_{ptilt} = 1.1999$, $K_{pvel} = 0.1581$, $\tau_{dpos} = 0$) — within Simulink `linearize()` numeric-noise margin ($\leq 3\%$) and operationally equivalent. Paste the copy-paste gains block printed by each design script into `regbot_mg.m` and re-flash the firmware if you want exact alignment.
 
-> [!warning] Design-time graphs in the Task 1–4 sections are still v1 (pending MATLAB regeneration)
-> The *numerical derivations* in the Task 1–4 sections below use the v3 on-floor values, but the embedded **design-time plots** (Bode, Nyquist, pole-zero, closed-loop step, IC response) are byte-identical to the first-campaign (Day 4 wheels-up) versions — the design scripts weren't re-run with image-save enabled during the redesign. Curves, axis limits, and margin markers on those plots therefore do not exactly match the numeric values quoted in the surrounding text. The two **Simulink sanity-sim screenshots** (Task 2 $\theta_0 = 10°$ recovery and Task 4 2 m step) *are* v3 — they use the `_v3.png` variants and match the v3 gains.
->
-> **Affected plots** (all in `docs/images/` and `Exercises/Work/regbot/Images/`, no `_v3` variant yet):
-> - Task 1: `regbot_Gwv_bode.png`, `regbot_Gwv_pzmap.png`, `regbot_Gwv_pzmap_zoom.png`, `regbot_task1_bode.png`, `regbot_task1_step.png`
-> - Task 2: `regbot_Gtilt_bode.png`, `regbot_Gtilt_pzmap.png`, `regbot_Gtilt_pzmap_zoom.png`, `regbot_Gtilt_nyquist.png`, `regbot_task2_bode_post.png`, `regbot_task2_nyquist_post.png`, `regbot_task2_loop_bode.png`, `regbot_task2_ic_response.png`, `regbot_task2_sim_push.png` (push test)
-> - Task 3: `regbot_task3_plant_pz.png`, `regbot_task3_loop_bode.png`, `regbot_task3_step.png`
-> - Task 4: `regbot_task4_plant_pz.png`, `regbot_task4_loop_bode.png`
->
-> **To regenerate (from `REGBOT-Balance-Assignment/simulink/` in MATLAB):**
-> 1. Open `regbot_mg.m` once (or run it) so the v3 gains are in the base workspace.
-> 2. Run `design_task2_balance` — saves `Gwv/Gtilt` Bode, pzmaps, nyquist, `task2_bode_post`, `task2_nyquist_post`, `task2_ic_response`.
-> 3. Run `design_task3_velocity` — saves `task3_plant_pz`.
-> 4. Run `design_task4_position` — saves `task4_plant_pz`.
-> 5. Open-loop Bode plots (`regbot_task1_bode.png`, `regbot_task{2,3,4}_loop_bode.png`) and closed-loop step plots (`regbot_task1_step.png`, `regbot_task{2,3,4}_step.png`) are saved by the one-liners at the end of each design script, via `figure; margin(L_*);  saveas(gcf, fullfile(IMG_DIR, '…'))` / `figure; step(T_*); saveas(...)` — check the tail of each script and add a save call if it's missing.
-> 6. Task 2 push-disturbance sim: re-run `regbot_1mg.slx` with v3 gains and the 1 N / 0.1 s `Push Newton` active; save the scope snapshot as `regbot_task2_sim_push.png` (or save a new `…_v3.png` and update the link here).
-> 7. The Task 2 / Task 4 Simulink sanity sims are already v3 (`regbot_task2_sim_recovery_10deg_v3.png`, `regbot_task4_sim_step_v3.png`) and already linked.
+Firmware sign: `[cbal] kp` is negative (the firmware Balance block does not absorb the Lecture-10 Method-2 sign internally — finding from the v1 campaign, still applies).
+
+> [!note] Push-disturbance figure is still v1
+> The only design-time image that has *not* been re-rendered with the Day 5 on-floor cascade is the Task 2 push-disturbance Simulink sim (`regbot_task2_sim_push.png`, 2026-04-21 timestamp). It is kept as a qualitative illustration of regulation against a 1 N / 0.1 s push; the $\theta_0 = 10°$ IC recovery is re-rendered with v3 gains and is the authoritative sanity sim. All Bode / Nyquist / pole-zero / step-response / IC-response plots for Tasks 1–4 are from the 2026-04-22 design runs.
 
 ### Key shifts vs. the first-attempt (v1) design
 
 | Quantity       | v1 (Day 4 wheels-up) | v3 (Day 5 on-floor) | Change                                                        |
 | -------------- | -------------------- | ------------------- | ------------------------------------------------------------- |
 | $K_{pwv}$      | 3.31                 | 13.2037             | **×4**                                                        |
-| $\tau_{dtilt}$ | 0.1355 s             | 0.0442 s            | **−67%** (less Lead needed — inner loop is properly fast now) |
-| $\tau_{ipost}$ | 0.1682 s             | 0.1245 s            | −26% ($G_{tilt}$ peak shifted 5.95 → 8.03 rad/s)              |
-| $K_{pvel}$     | 0.162                | 0.1581              | −2% (RHP zero physics-fixed)                                  |
+| $\tau_{dtilt}$ | 0.1355 s             | 0.0454 s            | **−67%** (less Lead needed — inner loop is properly fast now) |
+| $\tau_{ipost}$ | 0.1682 s             | 0.1224 s            | −27% ($G_{tilt}$ peak shifted 5.95 → 8.17 rad/s)              |
+| $K_{pvel}$     | 0.162                | 0.1532              | −5% (RHP zero at +8.67 physics-fixed)                         |
 | $K_{ppos}$     | 0.5335               | 0.5411              | +1% (free integrator physics-fixed)                           |
 
 ### Hardware outcome summary (v3, 2026-04-22)
@@ -453,26 +440,26 @@ $$G_{wv}(s) = \frac{7.023\times10^5 s^3 + 7.023\times10^8 s^2 - 5.083\times10^7 
 **Bode plots:**
 
 ![[regbot_Gwv_bode.png]]
-*$G_{wv}$: Motor voltage → wheel velocity. Low-frequency DC gain matches physical expectation.*
+*$G_{wv}$: Motor voltage $\to$ wheel velocity, linearised from the Simulink model with the balance loop open (Task 1 inner loop is the Day 5 on-floor plant). DC gain $0.270$; roll-off sets in around the dominant pole at $-5.99$ rad/s, with faster electrical and encoder-filter poles further out.*
 
 ![[regbot_Gtilt_bode.png]]
-*$G_{tilt}$: Velocity reference → tilt angle. This is the plant the balance controller will see.*
+*$G_{tilt}$: Velocity reference $\to$ tilt angle. DC gain $+4.83 \times 10^{-4}$ rad/(m/s). $|G_{tilt}|$ peaks at $8.17$ rad/s (value $0.7068$) — this is the frequency the post-integrator will be placed at. Phase is governed by the right-half-plane pole at $+9.13$ rad/s.*
 
 **Pole–zero maps (shaded stability regions):**
 
 ![[regbot_Gwv_pzmap.png]]
-*$G_{wv}$ in the s-plane. The RHP pole (highlighted) is the unstable pendulum mode.*
+*$G_{wv}$ in the s-plane. With the balance loop open, linearising the Simulink model sees the pendulum mode through the wheel-velocity channel: one RHP pole at $\approx +11.23$ rad/s (orange ring) alongside the stable motor/encoder poles in the LHP.*
 
 ![[regbot_Gtilt_pzmap.png]]
-*$G_{tilt}$ in the s-plane. One RHP pole — the same physical falling mode.*
+*$G_{tilt}$ in the s-plane. One RHP pole at $\approx +9.13$ rad/s — the same physical falling mode as on $G_{wv}$, seen through the tilt channel. The controller must arrange one CCW Nyquist encirclement of $(-1, 0)$ to stabilise it.*
 
 **Zoomed pole–zero maps (focus on the slow dynamics around origin):**
 
 ![[regbot_Gwv_pzmap_zoom.png]]
-*$G_{wv}$ zoomed to ±50 rad/s. The RHP pole at $\approx +10.6$ rad/s is clearly visible with its orange ring.*
+*$G_{wv}$ zoomed to $\pm 50$ rad/s. The RHP pole at $\approx +11.23$ rad/s is clearly visible with its orange ring; two fast LHP poles at $\approx -22$ rad/s and a pole/zero near the origin dominate the low-frequency behaviour.*
 
 ![[regbot_Gtilt_pzmap_zoom.png]]
-*$G_{tilt}$ zoomed to ±50 rad/s. RHP pole at $\approx +8.7$ rad/s is the pendulum falling mode the balance controller must stabilise. Nearby LHP poles and zeros show the slow dynamics.*
+*$G_{tilt}$ zoomed to $\pm 50$ rad/s. RHP pole at $\approx +9.13$ rad/s (orange ring) is the pendulum falling mode the balance controller must stabilise. A complex pole pair near $-8 \pm 3j$ and a pair of zeros at $\pm 8$ show the slow dynamics and the non-minimum-phase physics inherited from the inverted-pendulum geometry.*
 
 **Nyquist plot of $G_{tilt}$:**
 
@@ -522,10 +509,10 @@ $$C_{wv}(s) = 13.2037 \cdot \frac{0.1s + 1}{0.1s}$$
 **Simulink / firmware:** `regbot_mg.m` and `config/regbot_group47.ini` (`[cvel]` block) carry these values.
 
 ![[regbot_task1_bode.png]]
-*Task 1 open-loop Bode with phase and gain margins marked.*
+*Task 1 open-loop Bode $L = C_{wv}\, G_{vel,\text{day5}}$. Title reads $Gm = \infty$, $Pm = 82.8°$ at $30$ rad/s. Magnitude rolls off at $\approx 20$ dB/decade beyond the $10$ rad/s PI zero; phase dips to $\approx -105°$ near the plant pole at $5.985$ rad/s and recovers to $\approx -97°$ at the $30$ rad/s crossover — hence the $82.8°$ PM.*
 
 ![[regbot_task1_step.png]]
-*Task 1 closed-loop step response — confirms $e_{ss} = 0$ and low overshoot.*
+*Task 1 closed-loop step response $T = L/(1+L)$. Rise from $0$ to $0.9$ in $\approx 75$ ms, peak overshoot $\approx 4\%$ at $t \approx 0.15$ s, settled to $1.0$ by $t \approx 0.3$ s. Zero steady-state error confirms the PI integrator is doing its job.*
 
 ---
 
@@ -589,19 +576,19 @@ Find the peak of $|G_{tilt}|$ on the Bode magnitude curve. With the Day 5 on-flo
 
 | Quantity | Value |
 |---|---|
-| Peak magnitude $\lvert G_{tilt}\rvert_{\max}$ | $0.413$ |
-| Peak frequency $\omega_{\text{peak}}$ | $8.03$ rad/s |
+| Peak magnitude $\lvert G_{tilt}\rvert_{\max}$ | $0.7068$ |
+| Peak frequency $\omega_{\text{peak}}$ | $8.170$ rad/s |
 
 Place the post-integrator zero at the peak so the combined magnitude curve rolls off monotonically:
-$$\tau_{i,\text{post}} = \frac{1}{\omega_{\text{peak}}} = \frac{1}{8.03} = 0.1245\ \text{s}$$
-$$C_{PI,\text{post}}(s) = \frac{\tau_{i,\text{post}} s + 1}{\tau_{i,\text{post}} s} = \frac{0.1245\, s + 1}{0.1245\, s}$$
+$$\tau_{i,\text{post}} = \frac{1}{\omega_{\text{peak}}} = \frac{1}{8.170} = 0.1224\ \text{s}$$
+$$C_{PI,\text{post}}(s) = \frac{\tau_{i,\text{post}} s + 1}{\tau_{i,\text{post}} s} = \frac{0.1224\, s + 1}{0.1224\, s}$$
 $$G_{tilt,\text{post}}(s) = -\,C_{PI,\text{post}}(s)\cdot G_{tilt}(s)$$
 
-> [!note] Where $8.03$ rad/s came from
-> The peak frequency of $|G_{tilt}|$ moved from $5.95$ rad/s in the first-attempt cascade to $8.03$ rad/s here because the inner wheel-speed loop is now four times faster. A faster inner loop pushes the closed-balance plant's strongest response up in frequency, which in turn moves the post-integrator. $\tau_{i,\text{post}}$ therefore drops $26\%$ (from $0.1682$ to $0.1245$ s).
+> [!note] Where $8.17$ rad/s came from
+> The peak frequency of $|G_{tilt}|$ moved from $5.95$ rad/s in the first-attempt cascade to $8.17$ rad/s here because the inner wheel-speed loop is now four times faster. A faster inner loop pushes the closed-balance plant's strongest response up in frequency, which in turn moves the post-integrator. $\tau_{i,\text{post}}$ therefore drops $27\%$ (from $0.1682$ to $0.1224$ s).
 
 ![[regbot_task2_bode_post.png]]
-*Bode plots of $G_{tilt}$ (blue) and $G_{tilt,\text{post}}$ (orange). After the post-integrator the magnitude curve is monotonically decreasing beyond $\omega_{\text{peak}}$ — the condition Method 2 requires before designing the outer loop.*
+*Bode plots of $G_{tilt}$ (blue) and $G_{tilt,\text{post}} = -C_{PI,\text{post}}\,G_{tilt}$ (orange). The raw plant's $|G_{tilt}|$ peaks at $8.17$ rad/s, then drops; multiplying by the PI zero at that same frequency flattens the peak and forces the orange curve to roll off monotonically beyond it — the precondition Method 2 requires before designing the outer loop.*
 
 ![[regbot_task2_nyquist_post.png]]
 *Nyquist of $G_{tilt,\text{post}}$. One clean CCW encirclement of $(-1, 0)$ — matches $P = 1$, so the plant is now stabilisable by a standard outer controller.*
@@ -623,22 +610,22 @@ $$\tau_i = \frac{N_i}{\omega_c} = \frac{3}{15} = 0.200\ \text{s}, \qquad C_{PI}(
 
 | Contribution | Value at $\omega_c = 15$ rad/s |
 |---|---|
-| $\angle G_{tilt,\text{post}}(j\omega_c)$ (from Bode) | $-135.09°$ |
+| $\angle G_{tilt,\text{post}}(j\omega_c)$ (from Bode) | $-135.81°$ |
 | $\angle C_{PI}(j\omega_c) = -\arctan(1/N_i)$ | $-18.43°$ |
-| $\phi_\text{Lead}$ required $= -180° + \gamma_M - \phi_G - \phi_{PI}$ | $+33.52°$ |
+| $\phi_\text{Lead}$ required $= -180° + \gamma_M - \phi_G - \phi_{PI}$ | $+34.25°$ |
 
-The required Lead is noticeably smaller than it would have been without the redesigned inner loop ($+63.8°$ in the first-attempt cascade). The post-integrator peak moved up to $8.03$ rad/s, so at the fixed $\omega_c = 15$ rad/s the post-integrated plant has more available phase — less lift is needed from the Lead.
+The required Lead is noticeably smaller than it would have been without the redesigned inner loop ($+63.8°$ in the first-attempt cascade). The post-integrator peak moved up to $8.17$ rad/s, so at the fixed $\omega_c = 15$ rad/s the post-integrated plant has more available phase — less lift is needed from the Lead.
 
 **3c. Lead from gyro.** The REGBOT gyro directly measures $\dot\theta$, so
 $$\tau_d\, \dot\theta + \theta = (\tau_d s + 1)\,\theta$$
 is a proper, noise-free realisation of the ideal Lead — no filter pole needed (Lecture 10 slide 24). Solve for $\tau_d$:
-$$\tau_d = \frac{\tan(\phi_\text{Lead})}{\omega_c} = \frac{\tan(33.52°)}{15} = 0.0442\ \text{s}$$
+$$\tau_d = \frac{\tan(\phi_\text{Lead})}{\omega_c} = \frac{\tan(34.25°)}{15} = 0.0454\ \text{s}$$
 
 This is $67\%$ smaller than the first-attempt value ($0.1355$ s) — physically, the faster inner loop means the balance controller does not have to lean on the Lead as heavily to restore phase at $\omega_c$.
 
 **3d. Loop gain.** Choose $K_P$ so $|L(j\omega_c)| = 1$:
-$$|C_{PI}(j\omega_c)\cdot C_{\text{Lead}}(j\omega_c)\cdot G_{tilt,\text{post}}(j\omega_c)| = 0.833$$
-$$K_P = \frac{1}{0.833} = 1.1999$$
+$$|C_{PI}(j\omega_c)\cdot C_{\text{Lead}}(j\omega_c)\cdot G_{tilt,\text{post}}(j\omega_c)| = 0.8424$$
+$$K_P = \frac{1}{0.8424} = 1.1871$$
 
 **Full controller** (as viewed from pitch measurement to `vel_ref`):
 $$C_\text{total}(s) = K_P \cdot \underbrace{\frac{-(\tau_{i,\text{post}}s + 1)}{\tau_{i,\text{post}}s}}_{\text{sign + post-integrator}} \cdot \underbrace{\frac{\tau_i s + 1}{\tau_i s}}_{\text{outer PI}} \cdot \underbrace{(\tau_d s + 1)}_{\text{Lead (gyro)}}$$
@@ -651,35 +638,35 @@ $$C_\text{total}(s) = K_P \cdot \underbrace{\frac{-(\tau_{i,\text{post}}s + 1)}{
 |---|---|---|
 | Achieved $\omega_c$ | $15.00$ rad/s | matches spec ✓ |
 | Phase margin $\gamma_M$ | $60.00°$ | matches spec ✓ |
-| Gain margin | $-5.58$ dB | see note below |
+| Gain margin | $-5.44$ dB (at $5.73$ rad/s) | see note below |
 | Closed-loop RHP poles | $0$ | stable ✓ |
 
 ![[regbot_task2_loop_bode.png]]
-*Open-loop Bode of $L = K_P\, C_{PI}\, C_{\text{Lead}}\, G_{tilt,\text{post}}$. Crossover at $15$ rad/s with $60°$ phase margin.*
+*Open-loop Bode of $L = K_P\, C_{PI}\, C_{\text{Lead}}\, G_{tilt,\text{post}}$ from the 2026-04-22 design run. Title reads $GM = -5.44$ dB (at $5.73$ rad/s), $PM = 60°$ (at $15$ rad/s). Magnitude crosses $0$ dB at $\omega_c = 15$ rad/s as designed; phase sits at $-120°$ at crossover (= $-180° + 60°$ phase margin).*
 
 > [!note] Why negative gain margin is OK here
-> For a plant with $P = 1$ RHP pole, the gain margin reported by `margin` is a **lower bound** — we need $|K|$ above a minimum, not below a maximum. A $GM = -5.58$ dB means "do not reduce gain below $10^{-5.58/20} \approx 0.53$× of designed value". This is the standard signature of an unstable-plant design (see Lecture 10 slides 5–7).
+> For a plant with $P = 1$ RHP pole, the gain margin reported by `margin` is a **lower bound** — we need $|K|$ above a minimum, not below a maximum. A $GM = -5.44$ dB means "do not reduce gain below $10^{-5.44/20} \approx 0.53$× of designed value". This is the standard signature of an unstable-plant design (see Lecture 10 slides 5–7).
 
 ![[regbot_task2_ic_response.png]]
-*Linear-model regulation: response to a $1$ rad output-disturbance impulse on pitch. Settling time $\approx 1.34$ s (down from $\approx 1.55$ s in the first-attempt cascade — the outer balance loop regulates slightly faster when the inner loop is properly fast). Linear-model proxy; the authoritative IC test is the Simulink simulation shown below.*
+*Linear-model regulation: response to a $\theta_0 = 10°$ output-disturbance step on pitch. Settling time (2 % envelope) $\approx 1.35$ s, peak undershoot $\approx 6.71°$. Slightly faster than the $\approx 1.55$ s in the first-attempt cascade — the outer balance loop regulates marginally faster when the inner loop is properly fast. Linear-model proxy; the authoritative IC test is the Simulink simulation shown below.*
 
 #### Design summary
 
-| Parameter           | Symbol                 | Value       | Source                                              |
-| ------------------- | ---------------------- | ----------- | --------------------------------------------------- |
-| Target crossover    | $\omega_c$             | $15$ rad/s  | spec                                                |
-| Target phase margin | $\gamma_M$             | $60°$       | spec                                                |
-| PI zero ratio       | $N_i$                  | $3$         | standard placement                                  |
-| Post-integrator     | $\tau_{i,\text{post}}$ | $0.1245$ s  | $1/\omega_{\text{peak}}$ of $\lvert G_{tilt}\rvert$ ($\omega_{\text{peak}} = 8.03$ rad/s) |
-| Outer PI            | $\tau_i$               | $0.2000$ s  | $N_i/\omega_c$                                      |
-| Lead (gyro)         | $\tau_d$               | $0.0442$ s  | $\tan(\phi_\text{Lead})/\omega_c$ with $\phi_\text{Lead} = +33.52°$ |
-| Loop gain           | $K_P$                  | $1.1999$    | $|L(j\omega_c)| = 1$                                |
-| Linear settling (1 rad IC) | —               | $1.34$ s    | `initial()` on closed pitch loop                   |
+| Parameter                  | Symbol                 | Value      | Source                                                                                    |
+| -------------------------- | ---------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| Target crossover           | $\omega_c$             | $15$ rad/s | spec                                                                                      |
+| Target phase margin        | $\gamma_M$             | $60°$      | spec                                                                                      |
+| PI zero ratio              | $N_i$                  | $3$        | standard placement                                                                        |
+| Post-integrator            | $\tau_{i,\text{post}}$ | $0.1224$ s | $1/\omega_{\text{peak}}$ of $\lvert G_{tilt}\rvert$ ($\omega_{\text{peak}} = 8.170$ rad/s) |
+| Outer PI                   | $\tau_i$               | $0.2000$ s | $N_i/\omega_c$                                                                            |
+| Lead (gyro)                | $\tau_d$               | $0.0454$ s | $\tan(\phi_\text{Lead})/\omega_c$ with $\phi_\text{Lead} = +34.25°$                       |
+| Loop gain                  | $K_P$                  | $1.1871$   | $L(j\omega_c)= 1$                                                                         |
+| Linear settling (10° IC)   | —                      | $1.35$ s   | `initial()` on closed pitch loop, 2 % envelope                                            |
 
-All four values (`Kptilt`, `titilt`, `tdtilt`, `tipost`) are written to the MATLAB base workspace by `regbot_mg.m` and read automatically by the Simulink blocks when the model loads. The firmware `[cbal]` block in `config/regbot_group47.ini` carries the same numbers with `kp = −1.1999` (the firmware does not absorb the Method-2 sign flip internally — see the hardware-experiment section below).
+All four values (`Kptilt`, `titilt`, `tdtilt`, `tipost`) are written to the MATLAB base workspace by `regbot_mg.m` and read automatically by the Simulink blocks when the model loads. The firmware `[cbal]` block in `config/regbot_group47.ini` carries the same numbers with `kp` negative (the firmware does not absorb the Method-2 sign flip internally — see the hardware-experiment section below).
 
 > [!info] What shifted from the first-attempt design
-> The first-attempt cascade was designed against $G_{tilt}$ re-linearised with the Day 4 wheels-up inner loop. After switching Task 1 to the Day 5 on-floor plant, $G_{tilt}$ was re-linearised again: $|G_{tilt}|$ peak moved $5.95 \to 8.03$ rad/s, which shrank $\tau_{i,\text{post}}$ by $26\%$ and dropped $\tau_d$ by $67\%$ (Lead is $+33.5°$ not $+63.8°$). The loop gain nudged up slightly ($1.137 \to 1.1999$). Same $\omega_c$, same $\gamma_M$, smaller Lead — less Lead means less high-frequency amplification of gyro noise, a small bonus of the redesign.
+> The first-attempt cascade was designed against $G_{tilt}$ re-linearised with the Day 4 wheels-up inner loop. After switching Task 1 to the Day 5 on-floor plant, $G_{tilt}$ was re-linearised again: $|G_{tilt}|$ peak moved $5.95 \to 8.17$ rad/s, which shrank $\tau_{i,\text{post}}$ by $27\%$ and dropped $\tau_d$ by $67\%$ (Lead is $+34.25°$ not $+63.8°$). The loop gain nudged up slightly ($1.137 \to 1.1871$). Same $\omega_c$, same $\gamma_M$, smaller Lead — less Lead means less high-frequency amplification of gyro noise, a small bonus of the redesign.
 
 ---
 
@@ -764,7 +751,73 @@ The small non-zero steady-state voltage ($\approx 0.5$ V) is expected with no ve
 
 ---
 
-### Task 3 — Velocity outer loop 🚧 (building in Simulink)
+### Task 3 — Velocity Controller (Outer PI on $G_{vel,\text{outer}}$) ✅
+
+**Plant:** With Tasks 1 and 2 closed, linearising from the $\theta_\text{ref}$ input (output of `Kpvel_gain`) to the wheel-velocity filter output gives a 9th-order transfer function $G_{vel,\text{outer}}(s)$ with:
+
+- $0$ RHP poles — the balance loop has successfully stabilised the inverted-pendulum mode.
+- $1$ free integrator at the origin (the balance loop's Type-1 behaviour propagates to this channel). DC gain therefore effectively $\infty$ in the finite sense; `dcgain()` reports $\approx 2.07 \times 10^{3}$, dominated by the integrator.
+- $1$ **RHP zero at $+8.67$ rad/s** — the non-minimum-phase physics of balancing: the robot must roll *backward* before the body can tilt forward. This zero is set by geometry (wheel radius, CG height) and is invariant under inner-loop retuning.
+- A new LHP zero near $-8.03$ rad/s, matching the post-integrator peak from Task 2.
+- Dominant complex pole pair near $-10.5 \pm j$ — faster than the first-attempt cascade's $-2.6$ pair because the redesigned balance loop stiffens the closed tilt dynamics.
+
+![[regbot_task3_plant_pz.png]]
+*$G_{vel,\text{outer}}$ pole-zero map. The orange ring marks the physics-fixed RHP zero at $+8.67$ rad/s (blue circle). Free integrator at the origin visible as a pole on the imaginary axis; LHP poles are comfortably stable.*
+
+**Crossover constraint from the RHP zero.** An RHP zero at $z$ bounds the closed-loop bandwidth through the rule of thumb $\omega_c \leq z/5$, i.e.\ $\omega_c \lesssim 1.70$ rad/s here. Pushing past this either loses phase margin or incurs the characteristic inverse response. We pick the conservative $\omega_c = 1$ rad/s.
+
+**Design specs:**
+
+| Spec | Value | Reason |
+|---|---|---|
+| Crossover $\omega_c$ | $1$ rad/s | Safely below the RHP zero at $+8.67$ rad/s ($\omega_c \leq z/5$) |
+| Phase margin $\gamma_M$ | $\geq 60°$ | Spec |
+| PI zero placement $N_i$ | $3$ | Standard; zero at $\omega_c/N_i$ below crossover |
+
+**Step 1 — I-part.** $\tau_i = N_i/\omega_c = 3.00$ s.
+
+**Step 2 — Phase balance at $\omega_c$.** MATLAB's `bode()` reports the plant phase (continuously unwrapped) as $+267.42°$; the physically meaningful value is $267.42° - 360° = -92.58°$. The PI contributes $-\arctan(1/3) = -18.43°$. Adding these gives an open-loop phase of $\approx -111°$ at $\omega_c = 1$ rad/s, i.e.\ $\gamma_M \approx +69°$ already — **no Lead needed**. The $60°$ spec is met by the PI alone with $\approx 9°$ of margin to spare. (The design script's `phi_Lead = -368.98°` printout is a cosmetic unwrap artefact; the `margin()` verification below is the authoritative check.)
+
+**Step 3 — Loop gain.** $|C_{PI}(j1)\,G_{vel,\text{outer}}(j1)| = 6.5294$, so
+$$K_P = \frac{1}{6.5294} = 0.1532.$$
+
+The velocity controller is
+$$C_{vel}(s) = 0.1532 \cdot \frac{3s + 1}{3s}.$$
+
+**Step 4 — Verification** (from `margin(L_vel)`):
+
+| Metric | Value |
+|---|---|
+| Achieved $\omega_c$ | $1.00$ rad/s |
+| Phase margin $\gamma_M$ | $68.98°$ |
+| Gain margin | $6.21$ dB (at $25.4$ rad/s) |
+| Closed-loop RHP poles | $0$ (stable) |
+
+![[regbot_task3_loop_bode.png]]
+*Task 3 open-loop Bode $L = C_{vel}\, G_{vel,\text{outer}}$ from the 2026-04-22 design run. Title reads $Gm = 6.21$ dB (at $25.4$ rad/s), $Pm = 69°$ (at $1$ rad/s). MATLAB's continuous-phase convention puts the crossover-phase marker near $+240°$ — that is $+240° - 360° = -120°$, which matches $-180° + \gamma_M$ with $\gamma_M \approx 69°$. The gain-margin crossing at $25.4$ rad/s is where the second magnitude-crossing risk from the RHP zero is held in check by the $6.2$ dB margin.*
+
+![[regbot_task3_step.png]]
+*Task 3 closed-loop step response. Monotonic rise with zero steady-state error; rise time of order $1/\omega_c \approx 1$ s. No inverse response visible at this $\omega_c$ because we are safely below the RHP zero at $+8.67$ rad/s.*
+
+#### Design summary
+
+| Parameter               | Value      | Source                         |
+| ----------------------- | ---------- | ------------------------------ |
+| Target $\omega_c$       | $1$ rad/s  | Limited by RHP zero at $+8.67$ |
+| $N_i$                   | $3$        | PI zero placement              |
+| $\tau_i = N_i/\omega_c$ | $3.0000$ s | I-action                       |
+| $K_P$                   | $0.1532$   | $L(j\omega_c)= 1$              |
+| Achieved $\gamma_M$     | $68.98°$   | `margin()`                     |
+| Achieved GM             | $6.21$ dB  | `margin()`                     |
+
+`regbot_mg.m` (and the firmware `[cbav]` block in `config/regbot_group47.ini`) carries `Kpvel = 0.1581, tivel = 3.0000` — the earlier-campaign numbers, differing by $\approx 3\%$ from the fresh-run $0.1532$ above. Both designs meet the $60°$ PM spec; the firmware need not be updated unless you want exact alignment with this run's plots.
+
+> [!info] Why so few changes vs. the first-attempt cascade?
+> The RHP zero at $+8.67$ rad/s and the free integrator at the origin are both **physics-fixed** — they come from the robot's geometry and the position-to-velocity relationship. Neither moves when we retune the inner loops. So the Task 3 design target ($\omega_c = 1$ rad/s) and the zero-placement ($\tau_i = 3$ s) stay the same; only the tiny gain adjustment (0.162 $\to$ 0.1532, $\approx -5\%$) reflects the slightly stiffer closed-balance plant the velocity loop now sees.
+
+---
+
+### Task 3 — Simulink wiring guide (original build notes)
 
 The balance controller is now a subsystem with three ports (In1: pitch, In2: gyro, Out1: vel_ref). Task 3 adds a velocity outer loop that wraps around this subsystem:
 
@@ -1047,29 +1100,54 @@ Kept separation $\omega_{c,\text{pos}} / \omega_{c,\text{vel}} = 0.6$ (1.67× in
 > [!note] Cosmetic bug fix in `design_task4_position.m`
 > `bode()` returned `phi_G = +266.59°` at 0.2 rad/s (MATLAB unwraps continuously; the physically meaningful value is $-93.41°$). The phase-balance formula `phi_Lead = -180 + gamma_M - phi_G` then produced nonsense like $-386°$. Added wrapping via `mod(x + 180, 360) - 180` so the Lead logic always sees a sensible angle.
 
+#### Plant (v3 re-linearisation)
+
+With Tasks 1 + 2 + 3 closed, linearising from the position-loop gain output (`Kppos_gain`) to $x$-position gives an 11th-order transfer function $G_{pos,\text{outer}}(s)$:
+
+- $0$ RHP poles — inner + velocity loops have fully stabilised the dynamics.
+- $1$ pole at the origin — the free integrator from wheel velocity to wheel position. This is what makes a pure P controller sufficient for zero step-tracking error.
+- $1$ RHP zero at $+8.67$ rad/s — inherited from Task 3's $G_{vel,\text{outer}}$, the same non-minimum-phase physics of the inverted pendulum.
+- Dominant stable LHP poles near $-2.27$ and a complex pair near $-7.52$ (carried over from the Task 3 plant), plus fast motor/encoder poles far out in the LHP.
+
+![[regbot_task4_plant_pz.png]]
+*$G_{pos,\text{outer}}$ pole-zero map. Orange ring: the physics-fixed RHP zero at $+8.67$ rad/s (blue circle). A pole on the imaginary axis at the origin is the free integrator; every other pole is safely in the LHP.*
+
 #### Design landed
 
-After re-linearising `Gpos,outer` against the Day 5 cascade (Tasks 1, 2, 3 redesigned), the phase-balance computation gives:
+After re-linearising `Gpos,outer` against the Day 5 cascade (Tasks 1, 2, 3 redesigned), the 2026-04-22 `design_task4_position` run gives:
 
 | Parameter                                | Value              | Source                                                     |
 | ---------------------------------------- | ------------------ | ---------------------------------------------------------- |
 | $\omega_{c,\text{pos}}$                  | $0.6$ rad/s        | Iterated spec                                              |
-| $\angle G_{pos,\text{outer}}(j\omega_c)$ | $-122.9°$          | `bode(Gpos_outer, 0.6)`                                    |
-| $\phi_\text{Lead}$ required              | $+2.85°$           | $-180 + \gamma_M - \phi_G$                                 |
-| $K_{p,\text{pos}}$                       | **$0.5411$**       | $1/L(j\omega_c)$, $G_{pos,\text{outer}}(j\omega_c)= 1.848$ |
-| $\tau_{d,\text{pos}}$                    | $0$ (Lead dropped) | $(\tau_d s + 1)$ improper for Simulink — see below         |
-| Achieved $\gamma_M$                      | $\approx 57°$      | $\approx 3°$ below target after Lead drop                  |
-| Achieved GM                              | $25.17$ dB         | `margin()`                                                 |
-| Sim peak $v$ (2 m step)                  | $0.753$ m/s        | above $0.7$ m/s spec ✓                                     |
+| $\angle G_{pos,\text{outer}}(j\omega_c)$ | $-121.74°$         | `bode(Gpos_outer, 0.6)`                                    |
+| $\phi_\text{Lead}$ required              | $+1.74°$           | $-180 + \gamma_M - \phi_G$                                 |
+| $\tau_{d,\text{pos}}$ (ideal, design)    | $0.0505$ s         | $\tan(\phi_\text{Lead})/\omega_c$                          |
+| $K_{p,\text{pos}}$                       | **$0.5411$**       | $1/L(j\omega_c)$ with $\lvert C_\text{Lead}\,G_{pos,\text{outer}}(j\omega_c)\rvert = 1.8479$ |
+| Achieved $\gamma_M$ (with Lead)          | $60.00°$           | `margin()`                                                 |
+| Achieved $\gamma_M$ (Lead dropped)       | $\approx 58.26°$   | subtract $1.74°$; what firmware actually runs              |
+| Achieved GM                              | $25.34$ dB (at $7.62$ rad/s) | `margin()`                                       |
+| Sim peak $v$ (2 m step)                  | $0.760$ m/s        | above $0.7$ m/s spec ✓                                     |
+| Sim settling ($2\%$ env)                 | $11.2$ s           | mission window $10$ s — see note                           |
 
-**Controller:**
+**Controller (design-time, with Lead):**
+$$C_{\text{pos}}(s) = 0.5411 \cdot (0.0505\, s + 1)$$
+
+**Controller (firmware, Lead dropped for Simulink):**
 $$C_{\text{pos}}(s) = 0.5411$$
 
-Pure P. The plant's free integrator (position = $\int$ velocity) makes the open loop Type-1 already, so no I-term needed to zero the step-tracking error.
+The plant's free integrator (position $= \int$ velocity) makes the open loop Type-1 already, so no I-term is needed. The Lead is tiny here: it contributes only $1.74°$ of phase boost at $\omega_c$ and a magnitude of $\sqrt{1 + (0.0505 \cdot 0.6)^2} \approx 1.0005$ — essentially unity, so dropping it costs $\approx 1.74°$ of PM and $\approx 0.05\%$ of loop gain.
+
+#### Open-loop Bode (verification)
+
+![[regbot_task4_loop_bode.png]]
+*Task 4 open-loop Bode $L = C_{pos}\, G_{pos,\text{outer}}$ from the 2026-04-22 design run. Title reads $Gm = 25.3$ dB (at $7.62$ rad/s), $Pm = 60°$ (at $0.6$ rad/s) — this is the design-time plot with the Lead included. Magnitude crosses $0$ dB at $\omega_c = 0.6$ rad/s; gain margin is reached at $7.62$ rad/s where the phase dips through $-180°$. The RHP zero at $+8.67$ rad/s is the reason the phase curve bends back up at higher frequencies — one of the signatures of non-minimum-phase dynamics.*
+
+![[regbot_task4_step.png]]
+*Linear-model closed-loop step response to a $2$ m position command. Rise-time order $1/\omega_c \approx 1.7$ s; the $2\%$-envelope settling time is $11.2$ s (slightly over the $10$ s mission window, but the mission only requires reaching $2$ m, not settling inside $\pm 4$ cm).*
 
 #### Why we dropped the Lead
 
-The design script wanted a small Lead ($\tau_d = 0.083$ s) to push PM from $\approx 57°$ back up to $60°$ — a $2.85°$ phase contribution at $\omega_c$. Attempted to implement it as a `Transfer Fcn` block with Num `[tdpos 1]`, Den `1`, and Simulink rejected it:
+The design script wanted a small Lead ($\tau_d = 0.0505$ s) to push PM from $\approx 58.3°$ back up to the $60°$ target — a $1.74°$ phase contribution at $\omega_c$. Attempted to implement it as a `Transfer Fcn` block with Num `[tdpos 1]`, Den `1`, and Simulink rejected it:
 
 > *A time domain realization of the given transfer function for block 'Transfer Fcn' failed. The given transfer function is an improper transfer function.*
 
