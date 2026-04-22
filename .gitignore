@@ -26,9 +26,6 @@ octave-workspace
 .DS_Store
 Thumbs.db
 
-# Symlink to Report repo (separate submodule)
-Report
-
 # Obsidian vault config (if someone opens this folder in Obsidian)
 .obsidian/
 
