@@ -218,24 +218,42 @@ topos=2, vel=1.2 : time=10
 ```
 
 **Pass criteria:**
-- [ ] Reaches 2 m ± ~5 cm (v2: reached 1.97 m peak, 1.89 m final — within spec, limit-cycle tail)
-- [ ] Stays balanced throughout
-- [ ] **Peak velocity ≥ 0.7 m/s** (sim predicted 0.8 m/s; v2 hardware: 1.01 m/s)
-- [ ] Completes inside 10 s mission window
-- [ ] No motor saturation
+- [x] Reaches 2 m ± ~5 cm — **final 1.964 m, 3.6 cm short** (v2 was 10.7 cm short; 3× closer)
+- [x] Stays balanced throughout
+- [x] **Peak velocity ≥ 0.7 m/s** — **0.792 m/s** (above spec; v2 was 1.01)
+- [x] Completes inside 10 s mission window
+- [x] No motor saturation — **voltage peak 4.95 V, 0 saturation samples**
 
 **Log file — full absolute path to paste into the GUI:**
 ```
 C:\Users\Mads2\DTU\4. Semester\Linear Control Design\REGBOT-Balance-Assignment\logs\test4_position_2m_v3_onfloor_2026-04-22.txt
 ```
 
-**Notes (post-test):**
-- Final / peak position:
-- Peak velocity:
-- Settling time:
-- Peak tilt:
-- Does the late limit-cycle still appear? (v2 pattern after target reached):
-- Plot: `figures/test4_position_2m_v3_onfloor_2026-04-22.png`
+**Notes (post-test):** ✅ **PASS — cleanest Test 4 of the whole campaign (2026-04-22)**
+
+| Metric | v2 baseline | **v3 measured** |
+|---|---|---|
+| Final position | 1.893 m (−10.7 cm) | **1.964 m (−3.6 cm)** |
+| Peak position | 1.974 m (overshoot+limit-cycle) | 1.964 m (no overshoot) |
+| Peak velocity | 1.01 m/s | **0.792 m/s** (still > 0.7 spec) |
+| Peak vel_ref | 1.15 m/s (cap 1.2) | 0.727 m/s |
+| Peak tilt | +25° | **+17°** (31% less) |
+| Tilt std | 5.18° | **2.93°** (43% tighter) |
+| Motor voltage peak | 4.75 V | 4.95 V (still no saturation) |
+| Saturation samples | — | **0** |
+| Late limit cycle (t > 10 s) | present (pitch ±10°, vref ±0.5) | **absent** |
+
+**Four wins over v2, one caveat on peak velocity:**
+
+1. **No late limit cycle.** Position sits steady at 1.964 m after reaching target. The tighter inner + balance loops don't hunt for their own tail.
+2. **3× closer to target** (−3.6 cm vs −10.7 cm). Tilt-offset bias matters much less because the balance loop is tighter.
+3. **31% less tilt during acceleration** (17° vs 25°). The inner loop commits harder, so the balance doesn't have to lean as far.
+4. **No motor saturation** (4.95 V peak). The 3b saturation worry didn't materialise because Test 4's `vel_ref` is the smooth output of the position P-controller — no sharp corner steps like 3b had.
+
+**Caveat:** v3 peak velocity is 0.79 m/s, vs v2's 1.01 m/s. Still above the 0.7 m/s spec, but a smaller margin. This is consistent with the overall redesign — tighter control → less over-shoot in tilt → less physically-generated thrust → slower peak velocity. The trade-off is better position accuracy (3× closer final) for less peak speed.
+
+![[test4_position_2m_v3_onfloor_2026-04-22.png]]
+*Test 4 v3 (blue) vs v2 (grey faint). Top: position — v3 reaches 1.964 m vs v2's 1.89 m, no overshoot, no limit cycle. Second: wheel velocities — smoother, lower peak (0.79 m/s vs 1.01). Third: tilt — dramatically smaller excursions (peak 17° vs 25°), and no late oscillations. Bottom: motor voltage — peak 4.95 V, no saturation.*
 
 ---
 
