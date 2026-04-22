@@ -100,23 +100,150 @@ See the _Day 5 redesign_ note at the bottom for why on-floor identification was 
 
 `design_task1_wheel`
 
-**Specs:** $\omega_c = 30$ rad/s, $\gamma_M \geq 60°$, $N_i = 3$.
+### What this loop does
 
-**PI zero:** $\tau_i = N_i / \omega_c = 0.100$ s.
+Task 1 is the **innermost** loop in the cascade: a PI that takes a wheel-velocity reference from the balance loop (`vel_ref`) and produces motor voltage. It is also the **fastest** loop on purpose — the designed crossover $\omega_c = 30$ rad/s is at least $2\times$ faster than Task 2 ($15$ rad/s), which is at least $15\times$ faster than Task 3 ($1$ rad/s), and so on. That spread is what makes the cascade work: once Task 1 is closed, every outer loop can pretend the voltage-to-velocity path is an approximately instantaneous unity gain, because it settles well within one sample of the next layer's dynamics. "Always design inner loops first" from [Lesson 10 §6.2](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance) is not a style point — it is the direct consequence of this bandwidth separation.
 
-**Phase balance at $\omega_c$.** Plant $-\arctan(30/5.985) = -78.7°$; PI $-\arctan(1/3) = -18.4°$. Total $-97.1°$ → natural $\gamma_M = +82.9°$ before any Lead. **No Lead needed.**
+Why **PI** (and not just P, and not yet PI-Lead)? The plant $G_{vel}(s) = 2.198/(s + 5.985)$ is **Type-0** — a plain first-order lag with no integrator. A P controller on a Type-0 plant leaves a non-zero steady-state error for a step: $e_{ss} = 1/(1 + K_p K_{DC}) \neq 0$, as derived in [Fundamentals §10.1](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory) and the table in [Lesson 9 §5.2](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%209%20-%20PI-Lead%20Design%20with%20Specifications). Adding the PI's integrator lifts the open loop to Type-1, which guarantees $e_{ss} = 0$ on a step. We don't need a Lead because — as Step 2 below shows — a plain PI already hits $\gamma_M \gg 60°$ on this plant; adding Lead would only add noise amplification for no phase-margin benefit.
 
-**Gain.** $|C_{PI}\cdot G_{vel}|(j30) = 0.0758$ → $K_p = 1/0.0758 = 13.2037$.
+### The plant
+
+$$G_{vel}(s) \;=\; \frac{2.198}{s + 5.985}$$
+
+A single-pole first-order lag. Reading off the features:
+
+- **DC gain** $K_{DC} = 2.198/5.985 = 0.367$ (m/s)/V — every volt produces $0.367$ m/s at steady state.
+- **Time constant** $\tau = 1/5.985 = 0.167$ s — the motor reaches $63.2\%$ of its final speed in ${\sim}167$ ms.
+- **Break frequency** $\omega_b = 5.985$ rad/s — below this, the plant is essentially a constant gain of $0.367$; above, the magnitude rolls off at $-20$ dB/decade and the phase slides from $0°$ toward $-90°$ (passing $-45°$ exactly at $\omega_b$).
+
+Design-relevant: at our target $\omega_c = 30$ rad/s (a factor of $5$ above $\omega_b$), the plant already behaves like an integrator — phase close to $-90°$, magnitude on a clean $-20$ dB/dec slope. This is a "nice" plant in the Lesson 9 sense, which is why a plain PI with $N_i = 3$ clears the PM spec without breaking a sweat.
+
+### Specifications, translated to the frequency domain
+
+| Spec | Value | What it means, and why this value |
+|---|---|---|
+| Crossover $\omega_c$ | $30$ rad/s | Closed-loop bandwidth ${\approx}30$ rad/s ${\approx}4.8$ Hz. This is the "how fast does the inner loop react" knob. Chosen $\geq 2\times$ faster than Task 2's $\omega_c = 15$ rad/s so Task 2 sees Task 1 as instantaneous. See [Lesson 9 §2](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%209%20-%20PI-Lead%20Design%20with%20Specifications) for the bandwidth / $\omega_c$ relationship. |
+| Phase margin $\gamma_M$ | $\geq 60°$ | Safety buffer before instability (see [Fundamentals §7.3](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory)). $60°$ is the course default — it maps to $\zeta \approx 0.6$ and ${\sim}10\%$ step overshoot on a 2nd-order target. Below ${\sim}45°$ the closed loop rings heavily; above ${\sim}70°$ the system becomes sluggish. |
+| $N_i$ | $3$ | PI zero placement ratio: $\tau_i = N_i / \omega_c$ places the PI zero $N_i$ times below $\omega_c$. $N_i = 3$ is the course minimum — see [Fundamentals §10.5.1](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory) and [Lesson 9 §4.1](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%209%20-%20PI-Lead%20Design%20with%20Specifications). See Step 1 below for the trade-off table. |
+
+### Step 1 — Place the PI zero at $\omega_c/N_i$
+
+**What we do.** Compute the integral time constant and write down the PI shape (no gain yet):
+
+$$\tau_i \;=\; \frac{N_i}{\omega_c} \;=\; \frac{3}{30} \;=\; 0.100 \text{ s}
+\qquad\Longrightarrow\qquad
+C_{PI,\text{shape}}(s) \;=\; \frac{\tau_i s + 1}{\tau_i s}$$
+
+**What this does on the Bode plot.** A PI has a pole at the origin and a zero at $\omega = 1/\tau_i$. With $\tau_i = 0.100$ s the zero sits at $10$ rad/s. Below $10$ rad/s the PI looks like a pure integrator: $-20$ dB/decade slope, phase near $-90°$. Above $10$ rad/s the zero cancels the integrator's slope, so the PI flattens to $0$ dB/decade, and its phase climbs back toward $0°$. The transition region is one decade wide, centred on the zero.
+
+At $\omega_c = 30$ rad/s (three times above the zero), the PI's phase is:
+
+$$\phi_{PI} \;=\; \arctan(\omega_c \tau_i) - 90° \;=\; \arctan(3) - 90° \;=\; 71.57° - 90° \;=\; -18.43°$$
+
+i.e. the PI has recovered most of its integrator phase by the time it reaches crossover.
+
+**Why $N_i = 3$ and not $1$ or $10$.** This is the core trade-off for the PI zero (see [Lesson 9 §4.1](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%209%20-%20PI-Lead%20Design%20with%20Specifications) and [Fundamentals §10.5.1](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory)). The PI phase at $\omega_c$ is $\phi_{PI} = \arctan(N_i) - 90°$:
+
+| $N_i$ | PI zero position | $\phi_{PI}$ at $\omega_c$ | Trade-off |
+|---|---|---|---|
+| $1$ | at $\omega_c$ | $-45°$ | Strong integral action right at $\omega_c$, but costs $45°$ of phase margin — eats into your budget. |
+| $3$ | one-third of $\omega_c$ | $-18.4°$ | Course default — meaningful integral action through a decade below $\omega_c$, with a manageable phase cost. |
+| $10$ | one-tenth of $\omega_c$ | $-5.7°$ | Almost-free phase-wise, but the integrator only kicks in at very low frequencies — the loop is slow to zero out disturbances. |
+
+$N_i = 3$ is the sweet spot and the course's cookbook choice. Unless the plant's own phase at $\omega_c$ leaves you with no budget (see Task 2), start with $N_i = 3$ and only revisit it if the phase balance doesn't close.
+
+**In MATLAB.** `design_task1_wheel.m` lines 60–66:
+
+```matlab
+wc_wv        = 30;       % target crossover [rad/s]
+gamma_M_spec = 60;       % phase margin spec [deg]
+Ni_wv        = 3;        % PI zero at wc/Ni
+
+tau_i_wv     = Ni_wv / wc_wv;                      % = 0.1 s
+C_wv_shape   = (tau_i_wv*s + 1) / (tau_i_wv*s);    % PI shape, no gain yet
+```
+
+This is just the formula typed out — there is nothing hidden. The script prints `tau_i = Ni/wc = 0.1000 s`; in Bode-plot terms, that fixes the PI zero at $1/\tau_i = 10$ rad/s.
+
+### Step 2 — Phase balance: do we need a Lead?
+
+**What we do.** Before computing a gain, check whether $C_{PI,\text{shape}} \cdot G_{vel}$ already clears the $60°$ phase-margin spec at our target $\omega_c$. If yes, no Lead is needed; if no, the Lead must close the phase gap. This is the **phase-balance equation** at the heart of the design procedure ([Fundamentals §10.8](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory), [Lesson 9 §3](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%209%20-%20PI-Lead%20Design%20with%20Specifications)):
+
+$$\gamma_M - 180° \;=\; \angle G_{vel}(j\omega_c) + \phi_{PI} + \phi_{Lead}
+\qquad\Longrightarrow\qquad
+\phi_{Lead} \;=\; (\gamma_M - 180°) - \angle G_{vel}(j\omega_c) - \phi_{PI}$$
+
+**Plant phase at $\omega_c$.** A first-order lag $K/(s + p)$ has phase $-\arctan(\omega/p)$. At $\omega_c = 30$, $p = 5.985$:
+
+$$\angle G_{vel}(j30) \;=\; -\arctan\left(\frac{30}{5.985}\right) \;=\; -\arctan(5.013) \;=\; -78.71°$$
+
+**PI phase at $\omega_c$.** From Step 1: $\phi_{PI} = -18.43°$.
+
+**Total open-loop phase (no Lead).** $-78.71° + (-18.43°) = -97.14°$.
+
+**Natural phase margin.** $\gamma_M^\text{natural} = 180° + (-97.14°) = +82.86°$.
+
+**Required Lead phase.** $\phi_{Lead} = (60° - 180°) - (-78.71°) - (-18.43°) = -22.86°$ — *negative*. A negative required Lead phase means the plant plus PI already deliver more phase margin than the spec asks for; a Lead block would push $\gamma_M$ even higher, but every Lead also amplifies noise through its zero. **No Lead needed.** Skip it.
+
+**Why that makes sense physically.** A first-order lag can never contribute more than $-90°$ of phase — that's its asymptotic limit. The PI adds a pole at the origin (another $-90°$) but its zero at $\omega_c/N_i$ pulls most of that phase back, so at $\omega_c$ the PI only costs $-18°$ instead of the full $-90°$. The grand total $\sim -97°$ sits nowhere near the $-180°$ stability line. First-order plant + PI is almost always "phase-free" at $\omega_c$ in this sense; you only reach for Lead when the plant itself has higher order / more phase lag at $\omega_c$ (as happens for the pendulum dynamics in Task 2 and for the position plant in Task 4).
+
+**In MATLAB.** Notice that `design_task1_wheel.m` does not explicitly compute $\phi_{Lead}$ — it jumps straight to the gain solve in Step 3. That's the author shortcutting because a first-order plant + PI at $N_i = 3$ is known to land the PM comfortably. The hand calculation above is the sanity check; the script confirms it after the fact via `margin(L_wv)` (Step 4).
+
+### Step 3 — Solve $K_p$ so $|L(j\omega_c)| = 1$
+
+**What we do.** Pick the gain $K_p$ that forces the open-loop magnitude to exactly $1$ (i.e. $0$ dB) at the chosen $\omega_c$. The crossover $\omega_c$ is *defined* as the frequency where $|L(j\omega)| = 1$, so we engineer it by scaling:
+
+$$|L(j\omega_c)| \;=\; K_p \cdot |C_{PI,\text{shape}}(j\omega_c)| \cdot |G_{vel}(j\omega_c)| \;=\; 1
+\qquad\Longrightarrow\qquad
+K_p \;=\; \frac{1}{\left|C_{PI,\text{shape}} \cdot G_{vel}\right|_{j\omega_c}}$$
+
+**Evaluate the unscaled loop magnitude.** Plug $\omega = 30$ into each factor:
+
+- $|C_{PI,\text{shape}}(j30)|$: numerator $|0.1(j30) + 1| = \sqrt{3^2 + 1^2} = \sqrt{10} = 3.162$. Denominator $|0.1(j30)| = 3$. So $|C| = \sqrt{10}/3 = 1.054$.
+- $|G_{vel}(j30)|$: $2.198 / |j30 + 5.985| = 2.198 / \sqrt{900 + 35.82} = 2.198 / 30.59 = 0.0719$.
+- Product: $1.054 \times 0.0719 = 0.0758$.
+
+So $K_p = 1/0.0758 = 13.2037$.
+
+**What that number means.** The *unscaled* loop $C_{PI,\text{shape}} \cdot G_{vel}$ attenuates a signal at $\omega_c = 30$ by a factor $0.0758$. In dB that's $20\log_{10}(0.0758) = -22.4$ dB — the magnitude curve sits $22.4$ dB below the $0$ dB line at $\omega_c$. Multiplying by $K_p$ lifts the entire magnitude curve uniformly (P-action is flat across frequency — [Fundamentals §10.1](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory)); the right $K_p$ lifts the $\omega_c$ point by exactly $22.4$ dB, parking it on the $0$ dB line. Because Step 2 already showed the phase at $\omega_c$ is $-97.14°$, the phase margin comes out to $82.86°$ as soon as the magnitude crossing lands at $30$ rad/s.
+
+Intuitively: $K_p = 13.2$ V per (m/s) says "for every m/s of velocity error, pipe $13.2$ V *instantly* into the motor." The integrator term $K_p/\tau_i = 132$ V per (m/s·s) on top adds the accumulated contribution that drives steady-state error to zero.
+
+**In MATLAB.** `design_task1_wheel.m` lines 68–73:
+
+```matlab
+% Kp so |L(j wc)| = 1
+magL_wc      = squeeze(bode(C_wv_shape * Gvel_day5, wc_wv));
+Kp_wv        = 1 / magL_wc;
+
+% Full controller + loop
+C_wv         = Kp_wv * C_wv_shape;
+L_wv         = C_wv * Gvel_day5;
+```
+
+The key line is `bode(C_wv_shape * Gvel_day5, wc_wv)` — calling `bode()` with a single frequency returns the magnitude of the (unscaled) loop at that one frequency. `squeeze` strips the dimensions off the 1×1×1 array MATLAB returns. Taking the reciprocal is the gain solve; everything else just assembles the controller and the loop for the verification plots. Script prints `|C_shape * G|_{wc} = 0.0758` and `Kp = 1/|.| = 13.2037` — the hand calc above reproduces both to the printed precision.
+
+### The full controller
 
 $$\boxed{\;C_{wv}(s) \;=\; 13.2037 \cdot \frac{0.1\,s + 1}{0.1\,s}\;}$$
 
-**Verification** (from `margin(L_{wv})`): $\omega_c = 30.00$ rad/s, $\gamma_M = 82.85°$, $GM = \infty$.
+Equivalently $K_p = 13.2037$ and $K_i = K_p/\tau_i = 132.037$ — the controller outputs $13.2\,e + 132\int e\,dt$ in units of volts per (m/s) and volts per (m/s·s), summed.
+
+### Step 4 — Verification: reading `margin(L_wv)` and the plots
+
+From `margin(L_wv)`: $\omega_c = 30.00$ rad/s, $\gamma_M = 82.85°$, $GM = \infty$.
+
+All three numbers match the hand calculation: the crossover is placed where we asked, the PM is the natural one predicted by Step 2, and the gain margin is infinite because the open-loop phase never actually reaches $-180°$ on this plant (see plot caption below).
 
 ![[regbot_task1_bode.png]]
-*Open-loop Bode $L_{wv} = C_{wv}\,G_{vel}$. Title reads $Gm = \infty$, $Pm = 82.8°$ at $30$ rad/s.*
+*Open-loop Bode $L_{wv} = C_{wv}\,G_{vel}$. **How to read it.** Top panel: magnitude in dB (log-y, log-x). Bottom panel: phase in degrees. The title `Gm = Inf, Pm = 82.8 deg (at 30 rad/s)` is the output of `margin()` — MATLAB finds where the magnitude crosses $0$ dB (that's the crossover $\omega_c$), then reads the phase there and reports $180° + \phi$. Our designed $\omega_c = 30$ rad/s is marked on both panels. Below $\omega_c$ the magnitude rises on a $-20$ dB/dec slope: that's the PI integrator dominating at low frequencies, which is what gives us the infinite low-frequency gain (Type-1 loop, zero $e_{ss}$). Above $\omega_c$ the magnitude continues to drop on $-20$ dB/dec — now it's just the plant pole rolling off (the PI has already flattened by then). The phase asymptote approaches $-180°$ (integrator $-90°$ + fully-developed plant $-90°$) but never crosses it on a first-order plant + PI, so `margin` reports $Gm = \infty$.*
 
 ![[regbot_task1_step.png]]
-*Closed-loop step response: rises to $0.9$ in ${\sim}75$ ms, ${\sim}4\%$ overshoot, settled to $1.0$ by $t \approx 0.3$ s. Zero steady-state error.*
+*Closed-loop step response. **How to read it.** $T = L/(1+L)$ gets a unit reference at $t = 0$. Rise time (10% → 90%) is ${\sim}75$ ms — consistent with the first-order approximation $\tau_{cl} \approx 2.2/\omega_c \approx 73$ ms. Peak overshoot ${\sim}4\%$ is far below the ${\sim}10\%$ that a $60°$ PM would give — our actual PM is $82.85°$, which lands closer to "critically damped" territory. By $t \approx 0.3$ s the output sits at $1.0$: zero steady-state error, as guaranteed by the PI integrator on a Type-0 plant making the overall loop Type-1 ([Fundamentals §11.2](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FFundamentals%20-%20Intuitive%20Control%20Theory)).*
+
+### How Task 2 uses this
+
+Once you paste the Task 1 gains into `regbot_mg.m`, running `design_task2_balance` will open `regbot_1mg.slx` with $K_{pwv} = 13.2$ and $\tau_{iwv} = 0.1$ s live in the base workspace, linearise the full Simulink model from `vel_ref` (the output of the balance controller) to the tilt-angle measurement, and hand you $G_{tilt}(s)$ — the 7th-order plant the balance controller will design against. That plant is only well-defined *because* the Task 1 loop is closed: otherwise the inner voltage-to-velocity dynamics would show up as extra (very fast) modes in $G_{tilt}$, muddling the balance design. This is the design pattern from [Lesson 10 §6.2](obsidian://open?vault=Obsidian&file=Courses%2F34722%20Linear%20Control%20Design%201%2FLecture%20Notes%2FLesson%2010%20-%20Unstable%20Systems%20and%20REGBOT%20Balance) — freeze the inner loop, linearise the outer plant around it, design against that.
 
 Paste into `regbot_mg.m`:
 
