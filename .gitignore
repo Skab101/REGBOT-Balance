@@ -31,3 +31,17 @@ Thumbs.db
 
 # (plots now go to docs/images/ on teammate machines; teammates should
 # avoid staging those — they're Mads's canonical versions)
+
+# ===========================================
+# Local-only Obsidian cross-vault junction
+# ===========================================
+# Windows directory junction at docs/_DTU-vault → the author's DTU
+# Obsidian vault, so that when docs/ is opened as a vault the
+# [[Lesson 10 …]], [[Day 5 …]], etc. wikilinks resolve to the
+# lecture notes that live in the DTU vault. Local convenience only
+# — teammates don't have that vault and don't need it.
+# Re-create on a fresh clone with:
+#   New-Item -ItemType Junction `
+#     -Path "docs\_DTU-vault" `
+#     -Target "<path-to-your-vault-root>"
+docs/_DTU-vault
