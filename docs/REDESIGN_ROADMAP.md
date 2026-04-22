@@ -20,7 +20,11 @@ Detailed plan: see Claude's plan file (local to the working machine).
     - [x] Re-linearised Gtilt with the new inner loop in place
     - [x] **Kptilt = 1.1999, titilt = 0.2000, tdtilt = 0.0442, tipost = 0.1245** (achieved wc = 15.00, PM = 60.00°, GM = −5.58 dB, 0 RHP closed-loop poles)
     - [x] τ_d dropped 67% vs old design (0.1355 → 0.0442) — less Lead needed because the inner loop is properly fast now
-- [ ] **Phase 3** — Task 3 redesign (re-linearise Gvel,outer)
+- [x] **Phase 3** — Task 3 redesign
+    - [x] Re-linearised Gvel,outer with new Task 1 + 2 gains in place
+    - [x] RHP zero still at +8.51 rad/s (physics-fixed)
+    - [x] **Kpvel = 0.1581, tivel = 3.0000** (achieved wc = 1.00, PM = 68.98°, GM = 5.84 dB)
+    - [x] Plant got a new LHP zero at −8.03 matching the tipost peak, and the complex pole pair moved from −2.63 to −10.4 (balance loop is doing more work)
 - [ ] **Phase 4** — Task 4 redesign (re-linearise Gpos,outer)
 - [ ] **Phase 5** — Push gains into `config/regbot_group47.ini`, verify in Simulink (startAngle=10, topos=2)
 - [ ] **Phase 6** — Hardware validation (Tests 0, 3a, 3b, 4 with `v3_onfloor` suffix)
@@ -36,3 +40,4 @@ Detailed plan: see Claude's plan file (local to the working machine).
 | 2026-04-22 | 0 | Branch created on both submodules; roadmap in place. |
 | 2026-04-22 | 1 | Task 1 PI redesigned against Gvel = 2.198/(s+5.985). New Kp = 13.2037, tau_i = 0.1000. Achieved wc = 30.00 rad/s, PM = 82.85°, GM = ∞. |
 | 2026-04-22 | 2 | Task 2 re-linearised. Gtilt magnitude peak moved 5.95 → 8.03 rad/s. New tipost = 0.1245, titilt = 0.2000, tdtilt = 0.0442 (**−67%**), Kptilt = 1.1999. PM = 60.00°, settling 1.34 s vs 1.55 before. |
+| 2026-04-22 | 3 | Task 3 re-linearised. RHP zero unchanged at +8.51. New Kpvel = 0.1581 (−2%), tivel = 3.0 (unchanged). PM = 68.98° (up from 64.2°), GM = 5.84 dB. |

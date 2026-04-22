@@ -87,11 +87,10 @@ tdtilt = 0.0442;
 tipost = 0.1245;
 
 % --- Task 3: Velocity outer loop (source: design_task3_velocity.m) -----
-% wc_vel = 1 rad/s picked from the RHP-zero constraint (z/5 rule);
-% achieves wc = 1.00 rad/s, PM = 64.2 deg, GM = 7.84 dB. No Lead.
-
-
-Kpvel  = 0.1616;
+% wc_vel = 1 rad/s (RHP-zero z/5 rule; zero still at +8.51 rad/s
+% after the Day 5 redesign). Achieved wc = 1.00 rad/s, PM = 68.98 deg,
+% GM = 5.84 dB. No Lead needed.
+Kpvel  = 0.1581;
 tivel  = 3.0000;
 
 % --- Task 4: Position outermost loop (source: design_task4_position.m)
