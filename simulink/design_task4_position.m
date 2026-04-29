@@ -53,7 +53,15 @@ Kppos = 0;     %#ok<NASGU>
 load_system(model);
 open_system(model);
 
-Gpos_outer = identify_tf(model, POS_CTRL_OUT_BLOCK, X_POS_BLOCK, X_POS_PORT);
+% --- Linearise Gpos,outer: pos_ref -> x_position ------------------------
+% Open the position loop at the Kppos_gain output and read x_position
+% (port 3 of the 'robot with balance' subsystem). Tasks 1+2+3 stay closed.
+io(1) = linio([model POS_CTRL_OUT_BLOCK], 1,          'openinput');
+io(2) = linio([model X_POS_BLOCK],        X_POS_PORT, 'openoutput');
+setlinio(model, io);
+sys        = linearize(model, io, 0);
+[num, den] = ss2tf(sys.A, sys.B, sys.C, sys.D);
+Gpos_outer = minreal(tf(num, den));
 
 P_count   = sum(real(pole(Gpos_outer)) > 0);
 n_int     = sum(abs(pole(Gpos_outer)) < 1e-6);   % poles ~ 0
@@ -63,15 +71,23 @@ fprintf('  STEP 0 — IDENTIFY THE PLANT  (Tasks 1+2+3 closed, Task 4 open)\n');
 fprintf('==============================================================\n');
 fprintf('  Gpos,outer(s) = pos_ref -> x_position\n');
 print_tf('Gpos_outer', Gpos_outer);
-describe_plant(Gpos_outer);
+
+% --- Describe Gpos,outer: poles, zeros, DC gain, RHP-pole count ---------
+fprintf('  Poles:  '); fprintf('%7.2f  ', sort(real(pole(Gpos_outer)))); fprintf('\n');
+fprintf('  Zeros:  '); fprintf('%7.2f  ', sort(real(zero(Gpos_outer)))); fprintf('\n');
+fprintf('  DC gain   = %.4e\n', dcgain(Gpos_outer));
+fprintf('  RHP poles = %d  (anything > 0 means the plant is unstable)\n\n', ...
+        sum(real(pole(Gpos_outer))>0));
+
 fprintf('  RHP poles                  = %d\n', P_count);
 fprintf('  Integrators (poles ~ 0)    = %d   (>= 1 expected, from v -> x)\n', n_int);
 if n_int >= 1
     fprintf('  -> Plant is Type-%d. Pure P alone gives e_ss = 0 on a step.\n\n', n_int);
 end
 
-figure(502); plot_pz_stability(Gpos_outer, 'G_{pos,outer}');
+figure(502); clf; zplane(zero(Gpos_outer), pole(Gpos_outer)); grid on
 xlim([-10 2]); ylim([-10 10]);
+title('Pole-zero map: G_{pos,outer}');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_task4_plant_pz.png'));
 
 

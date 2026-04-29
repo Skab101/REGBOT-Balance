@@ -47,13 +47,23 @@ VEL_CTRL_OUT_BLOCK = '/Kpvel_gain';   % linearisation break point
 % regbot_mg.m), so this is the plant the velocity controller sees.
 %
 % Defensive zeroing in case someone edited regbot_mg:
-Kpvel = 0;     %#ok<NASGU>
-tivel = 1;     %#ok<NASGU>
+Kpvel = 0;     
+tivel = 1;     
 
 load_system(model);
 open_system(model);
 
-Gvel_outer = identify_tf(model, VEL_CTRL_OUT_BLOCK, '/wheel_vel_filter');
+% --- Linearise Gvel,outer: theta_ref -> wheel_vel_filter ----------------
+% Open the velocity loop at the Kpvel_gain output (so the velocity PI is
+% NOT in the linearised path) and pick up the wheel-velocity filter as
+% the output. Tasks 1+2 stay closed because their gains are non-zero in
+% the workspace.
+io(1) = linio([model VEL_CTRL_OUT_BLOCK], 1, 'openinput');
+io(2) = linio([model '/wheel_vel_filter'], 1, 'openoutput');
+setlinio(model, io);
+sys        = linearize(model, io, 0);
+[num, den] = ss2tf(sys.A, sys.B, sys.C, sys.D);
+Gvel_outer = minreal(tf(num, den));
 
 P_count = sum(real(pole(Gvel_outer)) > 0);
 z_all   = zero(Gvel_outer);
@@ -64,7 +74,14 @@ fprintf('  STEP 0 — IDENTIFY THE PLANT  (Tasks 1+2 closed, Task 3 open)\n');
 fprintf('==============================================================\n');
 fprintf('  Gvel,outer(s) = theta_ref -> wheel_vel_filter\n');
 print_tf('Gvel_outer', Gvel_outer);
-describe_plant(Gvel_outer);
+
+% --- Describe Gvel,outer: poles, zeros, DC gain, RHP-pole count ---------
+fprintf('  Poles:  '); fprintf('%7.2f  ', sort(real(pole(Gvel_outer)))); fprintf('\n');
+fprintf('  Zeros:  '); fprintf('%7.2f  ', sort(real(zero(Gvel_outer)))); fprintf('\n');
+fprintf('  DC gain   = %.4e\n', dcgain(Gvel_outer));
+fprintf('  RHP poles = %d  (anything > 0 means the plant is unstable)\n\n', ...
+        sum(real(pole(Gvel_outer))>0));
+
 fprintf('  RHP poles    = %d   (Task 2 stabilisation worked if 0)\n', P_count);
 if ~isempty(rhp_z)
     fprintf('  RHP zeros    = %d   at  ', numel(rhp_z));
@@ -74,8 +91,9 @@ else
     fprintf('  RHP zeros    = 0\n\n');
 end
 
-figure(402); plot_pz_stability(Gvel_outer, 'G_{vel,outer}');
+figure(402); clf; zplane(zero(Gvel_outer), pole(Gvel_outer)); grid on
 xlim([-50 10]); ylim([-50 50]);
+title('Pole-zero map: G_{vel,outer}');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_task3_plant_pz.png'));
 
 

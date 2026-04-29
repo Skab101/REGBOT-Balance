@@ -47,8 +47,24 @@ tipost = 1;       % benign TF placeholder
 load_system(model);
 open_system(model);
 
-Gwv   = identify_tf(model, '/Limit9v', '/wheel_vel_filter');
-Gtilt = identify_tf(model, '/vel_ref', '/robot with balance');
+% --- Linearise Gwv: voltage -> wheel velocity ----------------------------
+% Insert an open-input at the model's voltage limiter output and an
+% open-output at the wheel-velocity filter, then linearise at t = 0.
+% Convert state-space -> tf and minreal-cancel matched pole/zero pairs.
+io_wv(1) = linio([model '/Limit9v'],          1, 'openinput');
+io_wv(2) = linio([model '/wheel_vel_filter'], 1, 'openoutput');
+setlinio(model, io_wv);
+sys_wv     = linearize(model, io_wv, 0);
+[num, den] = ss2tf(sys_wv.A, sys_wv.B, sys_wv.C, sys_wv.D);
+Gwv        = minreal(tf(num, den));
+
+% --- Linearise Gtilt: vel_ref -> tilt angle ------------------------------
+io_tilt(1) = linio([model '/vel_ref'],            1, 'openinput');
+io_tilt(2) = linio([model '/robot with balance'], 1, 'openoutput');
+setlinio(model, io_tilt);
+sys_tilt   = linearize(model, io_tilt, 0);
+[num, den] = ss2tf(sys_tilt.A, sys_tilt.B, sys_tilt.C, sys_tilt.D);
+Gtilt      = minreal(tf(num, den));
 
 P_count    = sum(real(pole(Gtilt))>0);
 dc         = dcgain(Gtilt);
@@ -61,7 +77,14 @@ fprintf('  Gwv(s)  = voltage -> wheel velocity   (Task 1 inner loop)\n');
 print_tf('Gwv', Gwv);
 fprintf('  Gtilt(s) = vel_ref -> tilt angle      (Task 2 outer plant)\n');
 print_tf('Gtilt', Gtilt);
-describe_plant(Gtilt);
+
+% --- Describe Gtilt: poles, zeros, DC gain, RHP-pole count ---------------
+fprintf('  Poles:  '); fprintf('%7.2f  ', sort(real(pole(Gtilt)))); fprintf('\n');
+fprintf('  Zeros:  '); fprintf('%7.2f  ', sort(real(zero(Gtilt)))); fprintf('\n');
+fprintf('  DC gain   = %.4e\n', dcgain(Gtilt));
+fprintf('  RHP poles = %d  (anything > 0 means the plant is unstable)\n\n', ...
+        sum(real(pole(Gtilt))>0));
+
 fprintf('  RHP poles of Gtilt   = %d   (P = %d for Nyquist bookkeeping)\n', P_count, P_count);
 fprintf('  DC gain of Gtilt     = %+.3e\n', dc);
 if P_count > 0
@@ -80,17 +103,29 @@ save_plot(figure(101), @() bode(Gtilt), ...
     'G_{tilt}: vel_{ref} -> tilt angle', ...
     IMG_DIR, 'regbot_Gtilt_bode.png');
 
-figure(102); plot_pz_stability(Gwv,   'Gwv');
+% Pole-zero maps (full + zoomed view of each plant)
+figure(102); clf; zplane(zero(Gwv),   pole(Gwv));   grid on
+title('Pole-zero map: G_{wv}');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_Gwv_pzmap.png'));
-figure(103); plot_pz_stability(Gtilt, 'Gtilt');
+
+figure(103); clf; zplane(zero(Gtilt), pole(Gtilt)); grid on
+title('Pole-zero map: G_{tilt}');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_Gtilt_pzmap.png'));
-figure(104); plot_pz_stability(Gwv,   'Gwv (zoomed)');
+
+figure(104); clf; zplane(zero(Gwv),   pole(Gwv));   grid on
 xlim([-50 50]); ylim([-50 50]);
+title('Pole-zero map: G_{wv} (zoomed)');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_Gwv_pzmap_zoom.png'));
-figure(105); plot_pz_stability(Gtilt, 'Gtilt (zoomed)');
+
+figure(105); clf; zplane(zero(Gtilt), pole(Gtilt)); grid on
 xlim([-50 50]); ylim([-50 50]);
+title('Pole-zero map: G_{tilt} (zoomed)');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_Gtilt_pzmap_zoom.png'));
-figure(106); plot_nyquist_critical(Gtilt, 'Gtilt');
+
+% Nyquist of Gtilt with the critical point (-1, 0) marked.
+figure(106); clf; nyquist(Gtilt); grid on; hold on
+plot(-1, 0, 'r+', 'MarkerSize', 14, 'LineWidth', 2);
+title(sprintf('Nyquist: G_{tilt}  (RHP poles P = %d)', P_count));
 saveas(gcf, fullfile(IMG_DIR, 'regbot_Gtilt_nyquist.png'));
 
 
@@ -149,7 +184,10 @@ save_plot(figure(300), @() bode(Gtilt, Gtilt_post, w_grid), ...
 legend('G_{tilt}(s)', '-C_{PI,post}(s) G_{tilt}(s)', 'Location', 'best');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_task2_bode_post.png'));
 
-figure(301); plot_nyquist_critical(Gtilt_post, 'G_{tilt,post}  (one CCW encirclement of -1)');
+% Nyquist of the stabilised plant: should make one CCW encirclement of (-1,0).
+figure(301); clf; nyquist(Gtilt_post); grid on; hold on
+plot(-1, 0, 'r+', 'MarkerSize', 14, 'LineWidth', 2);
+title('Nyquist: G_{tilt,post}  (one CCW encirclement of -1)');
 saveas(gcf, fullfile(IMG_DIR, 'regbot_task2_nyquist_post.png'));
 
 
@@ -241,8 +279,12 @@ fprintf('    Gain margin            = %.2f dB      (negative is OK on P=1 plants
 fprintf('                                          lower bound on |K| for stability)\n');
 fprintf('  Closed-loop poles (real parts, sorted):\n');
 fprintf('    '); fprintf('%+7.2f  ', sort(real(cl_poles))); fprintf('\n');
-fprintf('  RHP closed-loop poles    = %d   %s\n\n', rhp_cl, ...
-        ternary(rhp_cl==0, '(stable ✓)', '(UNSTABLE — redesign)'));
+if rhp_cl == 0
+    stab_msg = '(stable ✓)';
+else
+    stab_msg = '(UNSTABLE — redesign)';
+end
+fprintf('  RHP closed-loop poles    = %d   %s\n\n', rhp_cl, stab_msg);
 
 save_plot(figure(302), @() margin(L_tilt), ...
     'Step 4: Open-loop  L = K_P C_{PI} C_{Lead} G_{tilt,post}', ...
